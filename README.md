@@ -395,7 +395,7 @@ git checkout -b feature/rag-pipeline-api      # Person 2
 git checkout -b feature/frontend              # Person 3
 ```
 
----
+<!---
 
 ## ⚠️ Limitations
 
@@ -406,7 +406,7 @@ git checkout -b feature/frontend              # Person 3
 - **Free-tier rate limits** — mitigated by multi-key rotation; add more keys for heavy usage
 - **Not clinically certified** — development and research use only
 
----
+--->
 
 ## 🔭 Roadmap
 
