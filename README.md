@@ -1,216 +1,3 @@
-# 🏥 Medical Document AI Assistant
-### Hybrid RAG-Powered Medical Intelligence Platform
-
-> Upload a medical PDF. Ask clinical questions. Get grounded, evidence-backed answers.
-
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat&logo=fastapi&logoColor=white)
-![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat&logo=react&logoColor=black)
-![Vite](https://img.shields.io/badge/Vite-5+-646CFF?style=flat&logo=vite&logoColor=white)
-![LangChain](https://img.shields.io/badge/LangChain-Latest-1C3C3C?style=flat)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat)
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-- [API Reference](#-api-reference)
-- [Team & Contributions](#-team--contributions)
-- [Limitations](#-limitations)
-- [Disclaimer](#-disclaimer)
-
----
-
-## 🔍 Overview
-
-The **Medical Document AI Assistant** is a full-stack, locally-run AI platform for medical document intelligence. It combines **semantic vector search** (FAISS) and **keyword retrieval** (BM25) into a hybrid RAG pipeline, powered by **Groq LLaMA 3 70B** for inference and **Voyage AI `voyage-large-3`** for embeddings — all on free-tier APIs with zero cloud cost.
-
-Upload any medical PDF — discharge summaries, cardiology consults, pathology reports — and instantly get:
-- Structured extraction of diagnoses, medications, allergies, and more
-- Conversational Q&A grounded strictly in the document
-- Confidence scoring on every answer
-- Source evidence citations with page references
-- Hallucination prevention via safety validation
-
----
-
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 📄 **PDF Upload** | Drag-and-drop medical PDFs with EasyOCR fallback for scanned documents |
-| 🔍 **Hybrid Retrieval** | FAISS semantic search + BM25 keyword search merged and reranked |
-| 🤖 **Conversational Q&A** | Multi-turn chat with full conversation history awareness |
-| 🧬 **Structured Extraction** | Auto-extracts diseases, medications, allergies, symptoms, abnormalities |
-| 📊 **Confidence Scoring** | Every answer rated High / Medium / Low based on retrieval quality |
-| 🛡️ **Safety Validation** | Blocks LLM calls when evidence is insufficient — no hallucinations |
-| 📌 **Source Citations** | Every response includes the exact document chunks that support it |
-| 🔑 **Multi-Key Failover** | Auto-rotates API keys to handle free-tier rate limits gracefully |
-| 💡 **4-Page React UI** | Dashboard, Chat Assistant, Medical Summary, Source Evidence Viewer |
-
----
-
-## 🛠 Tech Stack
-
-### Frontend
-| Tool | Purpose |
-|---|---|
-| React 18 + Vite | UI framework + dev server |
-| Tailwind CSS | Styling |
-| React Router DOM | Page routing |
-| React Context API | Global state management |
-| Axios | HTTP client |
-
-### Backend
-| Tool | Purpose |
-|---|---|
-| FastAPI | REST API framework |
-| Python 3.11+ | Backend language |
-| Uvicorn | ASGI server |
-| Pydantic v2 | Request/response validation |
-| LangChain | RAG orchestration |
-
-### AI / ML
-| Tool | Purpose |
-|---|---|
-| Groq `llama3-70b-8192` | LLM inference (free tier) |
-| Voyage AI `voyage-large-3` | Semantic embeddings (free tier) |
-| FAISS-CPU | Vector similarity search (in-RAM) |
-| rank-bm25 | BM25 keyword retrieval |
-| PyMuPDF | PDF text extraction |
-| EasyOCR | OCR fallback for scanned PDFs |
-
----
-
-## 🏗 Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              React Frontend  (localhost:5173)                │
-│  Dashboard │ Chat Assistant │ Medical Summary │ Sources      │
-└────────────────────────┬────────────────────────────────────┘
-                         │  Axios (via Vite proxy)
-┌────────────────────────▼────────────────────────────────────┐
-│              FastAPI Backend  (localhost:8000)               │
-│  POST /upload │ POST /chat │ GET /summary │ GET /sources     │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-   PDF Processing    Hybrid RAG     Extraction
-   ─────────────    ──────────     ──────────
-   PyMuPDF           FAISS          Groq 70B
-   EasyOCR  ──►   +  BM25    ──►   Structured
-   Chunking       Reranker         NER Output
-          │              │
-          ▼              ▼
-    Voyage AI       Groq LLM
-   voyage-large-3  llama3-70b
-   (Embeddings)    (Answers)
-```
-
-### Upload Flow
-
-```
-User uploads PDF
-      │
-      ▼
-PyMuPDF extracts text
-      │
-      ├─── Text quality OK? ──NO──► EasyOCR fallback
-      │
-      ▼
-Split into chunks (700 chars, 120 overlap)
-      │
-      ├──► Voyage AI embeds chunks ──► FAISS index (RAM)
-      │
-      ├──► BM25 index built from chunks (RAM)
-      │
-      └──► Groq 70B extracts entities ──► MedicalSummary
-```
-
-### Query Flow
-
-```
-User asks question
-      │
-      ▼
-Hybrid Search (FAISS top-10 + BM25 top-10)
-      │
-      ▼
-Reranker → top-5 chunks
-      │
-      ├──► Confidence Score (High / Medium / Low)
-      │
-      ├──► Safety Check (evidence sufficient?)
-      │         │
-      │         └──NO──► "Insufficient medical evidence found."
-      │
-      ▼
-Groq LLaMA 3 70B generates grounded answer
-      │
-      ▼
-Return: answer + confidence + source citations
-```
-
----
-
-## 📁 Project Structure
-
-```
-medical-ai-assistant/
-│
-├── backend/
-│   ├── main.py                    # FastAPI app, routes, session store
-│   ├── requirements.txt
-│   ├── .env                       # API keys (not committed)
-│   ├── .env.example               # Safe template
-│   └── modules/
-│       ├── api_manager.py         # Multi-key rotation + failover
-│       ├── pdf_parser.py          # PDF → raw text
-│       ├── ocr.py                 # EasyOCR fallback
-│       ├── chunking.py            # Text → Document chunks
-│       ├── embeddings.py          # Voyage AI wrapper
-│       ├── vector_store.py        # FAISS index
-│       ├── hybrid_retrieval.py    # FAISS + BM25 merge
-│       ├── reranker.py            # Combined score reranking
-│       ├── rag_pipeline.py        # LangChain RAG chain
-│       ├── entities.py            # Groq structured NER
-│       ├── medical_summary.py     # Pydantic schema
-│       ├── confidence.py          # Similarity → confidence label
-│       ├── safety.py              # Evidence sufficiency check
-│       └── prompts.py             # All LLM prompt templates
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx                # Root + React Router setup
-│   │   ├── context/
-│   │   │   └── AppContext.jsx     # Global state
-│   │   ├── services/
-│   │   │   └── api.js             # All Axios calls
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx      # Upload + entity overview
-│   │   │   ├── ChatAssistant.jsx  # Conversational Q&A
-│   │   │   ├── MedicalSummary.jsx # Structured summary
-│   │   │   └── SourceEvidence.jsx # Chunk viewer
-│   │   └── components/
-│   │       ├── Navbar.jsx
-│   │       ├── ConfidenceBadge.jsx
-│   │       └── SourceCard.jsx
-│   ├── vite.config.js
-│   └── tailwind.config.js
-│
-└── README.md
-```
-
----
-
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -374,10 +161,448 @@ Response:
   ],
   "evidence_found": true
 }
+=======
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        FRONTEND (React + Vite)               │
+│                        localhost:5173                        │
+│                                                             │
+│  ┌──────────┐  ┌──────────────┐  ┌──────────┐  ┌────────┐  │
+│  │Dashboard │  │ChatAssistant │  │ Medical  │  │Evidence│  │
+│  │(Upload)  │  │  (Q&A Chat)  │  │ Summary  │  │Viewer  │  │
+│  └────┬─────┘  └──────┬───────┘  └────┬─────┘  └───┬────┘  │
+│       │               │               │             │       │
+│       └───────────────┴───────────────┴─────────────┘       │
+│                            Axios (api.js)                    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTP
+┌──────────────────────────────▼──────────────────────────────┐
+│                    BACKEND (FastAPI + Uvicorn)               │
+│                        localhost:8000                        │
+│                                                             │
+│  POST /upload   POST /chat   GET /summary   GET /sources    │
+│       │              │            │               │         │
+│       ▼              ▼            ▼               ▼         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │                  RAG PIPELINE                       │    │
+│  │                                                     │    │
+│  │  PDF → Parse → OCR? → Chunk → Embed → FAISS+BM25   │    │
+│  │                                                     │    │
+│  │  Query → Embed → Hybrid Search → Rerank → Safety   │    │
+│  │       → Groq LLaMA 3.3 70B → Confidence Score      │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐    │
+│  │  Voyage AI   │  │  Groq API    │  │ FAISS + BM25   │    │
+│  │  voyage-3    │  │llama-3.3-70b │  │ (Local Index)  │    │
+│  │  Embeddings  │  │  Versatile   │  │  + Disk Cache  │    │
+│  └──────────────┘  └──────────────┘  └────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
+## Detailed Workflow
+
+### 1. Document Upload Pipeline
+
+```
+User selects PDF
+      │
+      ▼
+[UploadCard.jsx] ──── Client-side validation ────▶ Reject if:
+      │                                             • Not a PDF (file.type check)
+      │                                             • > 20MB (file.size check)
+      ▼
+POST /upload (multipart/form-data)
+      │
+      ▼
+[main.py /upload]
+      │
+      ├─ Validate: .pdf extension
+      ├─ Validate: size <= 20MB (server-side, MAX_UPLOAD_BYTES)
+      │
+      ▼
+[pdf_parser.py] extract_text_from_pdf()
+      │  Uses PyMuPDF (fitz) to extract text per page
+      │  Detects low-quality text: if avg chars/page < 100 → needs_ocr = True
+      │
+      ├─ needs_ocr = False ──▶ Use extracted pages directly
+      │
+      └─ needs_ocr = True ───▶ [ocr.py] extract_text_with_ocr()
+                                 EasyOCR processes each PDF page as image
+      │
+      ▼
+[chunking.py] chunk_pages()
+      │  RecursiveCharacterTextSplitter
+      │  chunk_size=700, chunk_overlap=120
+      │  Separators: ["\n\n", "\n", ". ", " ", ""]
+      │  Each chunk: {chunk_id, text, page, source}
+      │
+      ▼
+[embeddings.py] embed_texts()
+      │  Voyage AI voyage-3 model
+      │  Batches of 8 chunks per API call
+      │  input_type="document"
+      │  Returns List[List[float]] dim=1024
+      │
+      ▼
+[vector_store.py] build_index()
+      │  FAISS IndexFlatIP (inner product = cosine after L2 normalization)
+      │  Vectors normalized with faiss.normalize_L2()
+      │  Index + metadata pickled to faiss_index.bin / faiss_meta.pkl
+      │
+[hybrid_retrieval.py] build_bm25()
+      │  BM25Okapi built from tokenized chunk texts
+      │  Stored in-memory (_bm25, _bm25_corpus)
+      │
+[medical_summary.py] set_document_text()
+      │  Full document text stored in-memory for /summary endpoint
+      │
+      ▼
+UploadResponse { success, message, page_count, chunk_count, used_ocr }
+```
+
+### 2. Chat / RAG Pipeline
+
+```
+User types question
+      │
+      ▼
+POST /chat { question: string }
+      │
+      ▼
+[rag_pipeline.py] run_rag(question)
+      │
+      ├─── Step 1: Hybrid Retrieval ──────────────────────────────────
+      │    [embeddings.py] embed_query(question)
+      │      Voyage AI voyage-3, input_type="query", dim=1024
+      │
+      │    [vector_store.py] faiss_search(query_embedding, top_k=10)
+      │      Cosine similarity search → top 10 chunks
+      │
+      │    [hybrid_retrieval.py] bm25_search(question, top_k=10)
+      │      BM25Okapi keyword scores → top 10 chunks (score > 0 only)
+      │
+      │    Reciprocal Rank Fusion (k=60):
+      │      score(chunk) = Σ 1/(k + rank)  for FAISS and BM25 ranks
+      │      Deduplicate by chunk_id, sort by combined RRF score
+      │      Return top 10 merged chunks
+      │
+      ├─── Step 2: Reranking ─────────────────────────────────────────
+      │    [reranker.py] rerank(retrieved, question, top_k=5)
+      │      For each chunk:
+      │        faiss_score     × 0.5  (semantic similarity)
+      │        bm25_normalized × 0.3  (keyword relevance, capped at 1.0)
+      │        medical_density × 0.2  (medical term count / total words × 10)
+      │      Sort by combined score, return top 5 with rerank_score
+      │
+      ├─── Step 3: Safety Check ──────────────────────────────────────
+      │    [safety.py] is_evidence_sufficient(top_chunks)
+      │      Requires: len(chunks) >= 1 AND top rerank_score >= 0.10
+      │      If fails → return fallback "Insufficient medical evidence..."
+      │
+      ├─── Step 4: Context Building ──────────────────────────────────
+      │    Concatenate top chunk texts with [Page N] headers
+      │    Inject into MEDICAL_SYSTEM_PROMPT template
+      │
+      ├─── Step 5: LLM Generation ────────────────────────────────────
+      │    [api_manager.py] groq_manager.call_with_retry(_call_groq)
+      │      Model: llama-3.3-70b-versatile
+      │      Temperature: 0.1, Max tokens: 1024
+      │      System: MEDICAL_SYSTEM_PROMPT (strict grounding rules)
+      │      Auto-rotates API keys on 429/auth errors (up to 3 retries)
+      │
+      ├─── Step 6: Confidence Scoring ────────────────────────────────
+      │    [confidence.py] compute_confidence(top_chunks, answer)
+      │
+      │    Signal 1 — Retrieval quality (rerank_score):
+      │      High   if score >= 0.40
+      │      Medium if score >= 0.22
+      │      Low    otherwise
+      │
+      │    Signal 2 — Answer grounding:
+      │      Extract content words from answer (len>2, not stopwords)
+      │      Check fraction that appear in retrieved chunk texts
+      │      grounding >= 0.75 + Medium → promote to High
+      │      grounding >= 0.50 + Low    → promote to Medium
+      │      grounding <  0.30 + High   → demote to Medium
+      │
+      └─── Step 7: Response Assembly ─────────────────────────────────
+           ChatResponse {
+             answer: string,
+             confidence: { level, score },
+             sources: [SourceChunk, ...]
+           }
+```
+
+### 3. Medical Summary Pipeline
+
+```
+User clicks "Generate Summary"
+      │
+GET /summary
+      │
+[medical_summary.py] get_medical_summary()
+      │
+      ├─ If no document text → return empty MedicalSummary
+      │
+      ├─ Truncate text to first 6000 chars (token limit safety)
+      │
+      ├─ Format SUMMARY_EXTRACTION_PROMPT with document text
+      │
+      ├─ Groq LLaMA 3.3 70B (temperature=0.0 for determinism)
+      │
+      ├─ Strip markdown fences (```json ... ```)
+      │
+      └─ json.loads() → MedicalSummary {
+           diseases, medications, allergies,
+           abnormalities, recommendations
+         }
+```
+
+### 4. Evidence Viewer Pipeline
+
+```
+User enters search query
+      │
+GET /sources?query=...
+      │
+hybrid_search(query, top_k=10)  →  rerank(results, query, top_k=5)
+      │
+Return List[SourceChunk] with chunk text, page, rerank_score
+```
+
+---
+
+## Backend Modules
+
+| Module | Key Function | Description |
+|---|---|---|
+| `main.py` | — | FastAPI app, CORS, startup events, all 5 routes |
+| `api_manager.py` | `APIKeyManager` | Round-robin key rotation with retry on 429/auth errors |
+| `pdf_parser.py` | `extract_text_from_pdf()` | PyMuPDF extraction + OCR need detection |
+| `ocr.py` | `extract_text_with_ocr()` | EasyOCR per-page image rendering |
+| `chunking.py` | `chunk_pages()` | 700-char overlapping chunks with page metadata |
+| `embeddings.py` | `embed_texts()`, `embed_query()` | Voyage AI `voyage-3` (dim=1024), batch=8 |
+| `vector_store.py` | `build_index()`, `faiss_search()` | FAISS IndexFlatIP with L2-normalized cosine |
+| `hybrid_retrieval.py` | `hybrid_search()`, `build_bm25()` | RRF fusion of FAISS + BM25 results |
+| `reranker.py` | `rerank()` | Weighted score: 0.5×FAISS + 0.3×BM25 + 0.2×density |
+| `safety.py` | `is_evidence_sufficient()` | Min chunks=1, min rerank_score=0.10 |
+| `rag_pipeline.py` | `run_rag()` | Orchestrates all 7 steps of the RAG pipeline |
+| `confidence.py` | `compute_confidence()` | Retrieval quality + answer grounding dual signal |
+| `medical_summary.py` | `get_medical_summary()` | JSON-structured entity extraction via LLM |
+| `prompts.py` | — | `MEDICAL_SYSTEM_PROMPT`, `SUMMARY_EXTRACTION_PROMPT` |
+| `entities.py` | — | Pydantic v2 models: ChatRequest, ChatResponse, etc. |
+
+---
+
+## Frontend Components
+
+| Component | Purpose |
+|---|---|
+| `MainLayout.jsx` | Flex layout: `w-64 flex-shrink-0` sidebar + `flex-1` main content, `h-screen overflow-hidden` |
+| `Dashboard.jsx` | PDF upload, backend health indicator, post-upload metadata card |
+| `ChatAssistant.jsx` | Full-height chat UI, message history, Enter-to-send, source toggle |
+| `MedicalSummary.jsx` | "Generate Summary" button, 5-category grid (2–3 cols responsive) |
+| `EvidenceViewer.jsx` | Search bar, chunk results, pages covered, quick-search buttons |
+| `UploadCard.jsx` | Drag-and-drop zone, file.type + file.size guards, progress feedback |
+| `ChatBubble.jsx` | User (right, gradient) / assistant (left, glass) bubbles with sources |
+| `ConfidenceBadge.jsx` | Piecewise-normalized % display: High→70-100%, Medium→40-70%, Low→0-40% |
+| `SourceCard.jsx` | Chunk text, page number, rerank score display |
+| `SummarySection.jsx` | Category card with colored border, icon, and item list |
+| `ErrorAlert.jsx` | Dismissible red banner with × button |
+| `LoadingSpinner.jsx` | Animated spinner with optional label |
+| `DocumentContext.jsx` | Global React context: documentLoaded, uploadMeta, chatHistory, summary |
+| `api.js` | Axios instance (baseURL=`http://localhost:8000`, timeout=120s), 5 API functions |
+
+---
+
+## API Reference
+
+### `GET /health`
+```json
+Response: { "status": "ok", "version": "1.0.0" }
+```
+
+### `POST /upload`
+```
+Content-Type: multipart/form-data
+Body: file (PDF, max 20MB)
+
+Response 200: {
+  "success": true,
+  "message": "Document processed successfully.",
+  "page_count": 3,
+  "chunk_count": 6,
+  "used_ocr": false
+}
+Response 400: { "detail": "Only PDF files are accepted." }
+Response 400: { "detail": "File too large. Maximum allowed size is 20MB." }
+Response 422: { "detail": "No text could be extracted from PDF." }
+```
+
+### `POST /chat`
+```json
+Request:  { "question": "What is the patient's name?" }
+Response: {
+  "answer": "The patient's name is Kimberly Lawrence.",
+  "confidence": { "level": "High", "score": 0.2843 },
+  "sources": [
+    { "chunk_id": 0, "text": "...", "page": 1,
+      "source": "page_1", "rerank_score": 0.2843 }
+  ]
+}
+```
+
+### `GET /summary`
+```json
+Response: {
+  "diseases": ["Type 2 Diabetes Mellitus", "Peripheral Neuropathy"],
+  "medications": ["Metformin 500mg", "Gabapentin 300mg"],
+  "allergies": ["Penicillin"],
+  "abnormalities": ["Elevated HbA1c"],
+  "recommendations": ["Follow-up in 30 days"]
+}
+```
+
+### `GET /sources?query=...`
+```json
+Response: [
+  { "chunk_id": 2, "text": "...", "page": 1,
+    "source": "page_1", "rerank_score": 0.31 }
+]
+```
+
+---
+
+## Setup & Installation
+
+### Prerequisites
+- Python 3.10+ (tested on 3.14)
+- Node.js 18+
+- Groq API key(s) — [console.groq.com](https://console.groq.com)
+- Voyage AI API key — [dash.voyageai.com](https://dash.voyageai.com)
+
+### Backend Setup
+
+```powershell
+# 1. Navigate to backend
+cd medical-ai-assistant\backend
+
+# 2. Create virtual environment
+python -m venv venv
+
+# 3. Activate it
+.\venv\Scripts\activate
+
+# 4. Install pinned dependencies
+pip install -r requirements.txt
+
+# 5. Create .env file (see Environment Variables section)
+
+# 6. Start the server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Frontend Setup
+
+```powershell
+# 1. Navigate to frontend
+cd medical-ai-assistant\frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Start dev server
+npm run dev
+```
+
+Open **http://localhost:5173** in your browser.
+
+---
+
+## Environment Variables
+
+Create `backend/.env`:
+
+```env
+# Groq API keys (comma-separated for rotation)
+GROQ_API_KEYS=gsk_key1,gsk_key2
+
+# Voyage AI API key (comma-separated for rotation)
+VOYAGE_API_KEYS=pa-key1
+```
+
+**Key Rotation:** The `APIKeyManager` automatically rotates through multiple keys using `itertools.cycle`. On a 429 rate-limit or auth error, it advances to the next key and retries (up to 3 attempts with 1.5s delay).
+
+---
+
+## Security & Validation
+
+### File Upload Guards (Two-Layer)
+
+| Layer | Where | Checks |
+|---|---|---|
+| Client-side | `UploadCard.jsx` | `file.type !== 'application/pdf'` → reject, `file.size > 20*1024*1024` → reject |
+| Server-side | `main.py /upload` | `.pdf` extension check, `len(file_bytes) > MAX_UPLOAD_BYTES` → HTTP 400 |
+
+### CORS Policy
+Restricted to explicit origins — never wildcard in production:
+```python
+allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"]
+```
+
+### Anti-Hallucination
+- **Safety guard:** LLM call is blocked if `rerank_score < 0.10` or no chunks retrieved
+- **Strict system prompt:** Model instructed to respond only from provided context
+- **Grounding demotion:** If answer keywords don't appear in chunks (grounding < 30%), confidence demoted from High → Medium
+
+---
+
+## Confidence Scoring System
+
+The confidence badge shown per answer uses two independent signals:
+
+### Signal 1: Retrieval Quality
+Based on the top chunk's `rerank_score` (weighted combination):
+```
+rerank_score = (faiss_cosine × 0.5) + (bm25_normalized × 0.3) + (medical_density × 0.2)
+Realistic range: ~0.10 (no match) to ~0.55 (strong match)
+
+Thresholds:
+  High   ≥ 0.40
+  Medium ≥ 0.22
+  Low    < 0.22
+```
+
+### Signal 2: Answer Grounding
+```
+content_words = answer words with len > 2 and not in stopword list
+grounding = count(words in retrieved chunks) / len(content_words)
+
+Promotion rules:
+  grounding ≥ 0.75 + Medium retrieval → High
+  grounding ≥ 0.50 + Low retrieval   → Medium
+
+Demotion rule:
+  grounding < 0.30 + High retrieval  → Medium (hallucination risk)
+```
+
+### Display Normalization
+Raw `rerank_score` is NOT shown as-is (would appear as 28%). Instead, piecewise linear mapping to human-friendly percentages:
+```
+High   (0.40–0.55) → maps to 70–100%
+Medium (0.22–0.40) → maps to 40–70%
+Low    (0.00–0.22) → maps to 0–40%
+>>>>>>> debugging-and-integration
+```
+
+---
+
+<<<<<<< HEAD
 ## 👥 Team & Contributions
 
 | Developer | Owns |
@@ -434,3 +659,51 @@ This project is licensed under the MIT License.
 <p align="center">
   Built with FastAPI · React · LangChain · Groq · Voyage AI
 </p>
+=======
+## Running the Application
+
+```powershell
+# Terminal 1 — Backend
+cd medical-ai-assistant\backend
+.\venv\Scripts\activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — Frontend
+cd medical-ai-assistant\frontend
+npm run dev
+```
+
+| URL | Description |
+|---|---|
+| http://localhost:5173 | Main application |
+| http://localhost:5173/chat | Chat Assistant |
+| http://localhost:5173/summary | Medical Summary |
+| http://localhost:5173/evidence | Evidence Viewer |
+| http://localhost:8000/docs | Swagger UI (API explorer) |
+| http://localhost:8000/health | Backend health check |
+
+### Expected Startup Output (Backend)
+```
+[APIKeyManager] Loaded 2 key(s) for Groq
+[APIKeyManager] Loaded 1 key(s) for VoyageAI
+[VectorStore] Loaded existing index with N vectors.
+[BM25] Built BM25 index with N documents.
+[Startup] Medical AI Assistant backend is ready.
+INFO:     Application startup complete.
+```
+
+---
+
+## Supported Document Types
+
+- ✅ Lab Reports
+- ✅ Prescriptions
+- ✅ Discharge Summaries
+- ✅ Clinical Notes
+- ✅ Diagnostic Reports
+- ✅ Patient Records
+- ✅ Scanned/Image PDFs (via EasyOCR fallback)
+
+---
+
+*Medical AI Assistant v1.0.0 · Powered by Groq + Voyage AI*
