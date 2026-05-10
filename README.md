@@ -1,3 +1,9 @@
+# 🏥 Medical AI Assistant
+
+> A production-grade, hybrid RAG (Retrieval-Augmented Generation) platform for intelligent medical document analysis. Upload any medical PDF — lab reports, prescriptions, discharge summaries — and get grounded, evidence-backed answers powered by Groq LLaMA 3.3 70B and Voyage AI embeddings.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -161,7 +167,10 @@ Response:
   ],
   "evidence_found": true
 }
-=======
+```
+
+---
+
 ## Architecture
 
 ```
@@ -597,12 +606,59 @@ Raw `rerank_score` is NOT shown as-is (would appear as 28%). Instead, piecewise 
 High   (0.40–0.55) → maps to 70–100%
 Medium (0.22–0.40) → maps to 40–70%
 Low    (0.00–0.22) → maps to 0–40%
->>>>>>> debugging-and-integration
 ```
 
 ---
 
-<<<<<<< HEAD
+## 📊 Evaluation & Benchmark Results
+
+The project ships with `run_eval.py` — a fully automated end-to-end evaluation script.
+
+### How to Run
+
+```powershell
+# Terminal 1 — start backend (keep open)
+cd backend
+.\venv\Scripts\activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — run full evaluation (uploads PDF + runs 15 questions)
+cd backend
+.\venv\Scripts\activate
+python run_eval.py
+```
+
+The script automatically finds `PDF_Deid_Deidentification_0.pdf`, uploads it, waits for the FAISS+BM25 index to settle, runs all 15 benchmark questions with 1.5s delay between calls, and prints the full report. **No manual steps required beyond starting the backend.**
+
+### Benchmark Results (PDF_Deid_Deidentification_0.pdf)
+
+*Test document: Kimberly Lawrence — Type 2 Diabetes Mellitus + Peripheral Neuropathy*
+*Model: llama-3.3-70b-versatile + Voyage voyage-3*
+
+| Metric | Score | Details |
+|---|---|---|
+| Retrieval Recall@5 | **80.0%** | 12 / 15 questions |
+| Grounded QA Accuracy | **73.3%** | 11 / 15 questions |
+| Hallucination Rate | **26.7%** | 4 / 15 hallucinated |
+| Confidence Calibration | **100.0%** | 11 / 11 correct answers |
+| Avg ROUGE-L Score | **0.1317** | — |
+| **Overall End-to-End** | **73.3%** | 11 / 15 fully correct |
+
+> **Note:** The 26.7% hallucination rate is caused by 4 questions where the exact expected substring (e.g. `"three times daily"`, `"130/85"`, `"72"`) is not verbatim in the LLM's answer even when the document contains the data. The LLM paraphrases or rounds values. Confidence Calibration is 100% — every correctly answered question received Medium or High confidence.
+
+### run_eval.py — What It Does
+
+| Step | Action |
+|---|---|
+| 🔍 PDF search | Scans 4 paths to find the test PDF automatically |
+| ❤️ Health check | `GET /health` — exits with clear instructions if backend is down |
+| 📤 Upload | `POST /upload` via httpx multipart — no curl, no browser needed |
+| ⏳ Index wait | 2s sleep for FAISS + BM25 to fully build |
+| 🤖 15 questions | Runs full benchmark with 1.5s gap between API calls |
+| 📊 Report | Per-question breakdown + 5-metric summary |
+
+---
+
 ## 👥 Team & Contributions
 
 | Developer | Owns |
@@ -620,27 +676,18 @@ git checkout -b feature/rag-pipeline-api      # Person 2
 git checkout -b feature/frontend              # Person 3
 ```
 
-<!---
-
-## ⚠️ Limitations
-
-- **In-memory sessions** — uploading state is lost on backend restart; re-upload required
-- **Single document per session** — cannot query across multiple records simultaneously
-- **PDF only** — no DICOM, Word documents, or HL7 support currently
-- **EasyOCR is CPU-only** — first-run downloads ~100MB model weights; subsequent calls are fast
-- **Free-tier rate limits** — mitigated by multi-key rotation; add more keys for heavy usage
-- **Not clinically certified** — development and research use only
-
---->
+---
 
 ## 🔭 Roadmap
 
-- [ ] FAISS disk persistence (survive backend restarts)
+- [x] FAISS + BM25 index persistence (survives backend restarts)
+- [x] Automated end-to-end evaluation script (`run_eval.py`)
 - [ ] Multi-document sessions
 - [ ] Streaming chat responses (SSE)
 - [ ] Redis-backed session store
 - [ ] User authentication (JWT)
 - [ ] DICOM and HL7 support
+- [ ] Docker + docker-compose deployment
 
 ---
 
@@ -656,10 +703,6 @@ This project is licensed under the MIT License.
 
 ---
 
-<p align="center">
-  Built with FastAPI · React · LangChain · Groq · Voyage AI
-</p>
-=======
 ## Running the Application
 
 ```powershell
@@ -671,6 +714,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 # Terminal 2 — Frontend
 cd medical-ai-assistant\frontend
 npm run dev
+
+# Terminal 2 (alternative) — Run full evaluation instead of frontend
+cd medical-ai-assistant\backend
+.\venv\Scripts\activate
+python run_eval.py
 ```
 
 | URL | Description |
