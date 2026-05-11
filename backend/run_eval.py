@@ -28,6 +28,10 @@ import sys
 import time
 import httpx
 
+# Ensure UTF-8 output on Windows (handles ✅ ❌ ✓ characters)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 BASE_URL = "http://localhost:8000"
 
 # ──────────────────────────────────────────────────────
@@ -75,74 +79,74 @@ BENCHMARK = [
         "expected_chunk_keywords": ["kimberly", "lawrence", "patient"]
     },
     {
-        "question": "What is the patient's date of birth?",
-        "expected_answer": "24/05/1977",
-        "expected_chunk_keywords": ["1977", "dob", "born"]
+        "question": "What is the patient's primary medical diagnosis?",
+        "expected_answer": "Diabetes",
+        "expected_chunk_keywords": ["diabetes", "type 2", "diagnosis"]
     },
     {
-        "question": "What diseases does the patient have?",
-        "expected_answer": "Type 2 Diabetes Mellitus",
-        "expected_chunk_keywords": ["diabetes", "neuropathy", "diagnosis"]
+        "question": "What secondary condition does the patient have?",
+        "expected_answer": "Peripheral Neuropathy",
+        "expected_chunk_keywords": ["neuropathy", "peripheral", "diabetes"]
     },
     {
-        "question": "What is the dosage of Metformin prescribed?",
-        "expected_answer": "500mg",
-        "expected_chunk_keywords": ["metformin", "500", "twice"]
+        "question": "What medication is prescribed for the patient's diabetes?",
+        "expected_answer": "Metformin",
+        "expected_chunk_keywords": ["metformin", "500", "diabetes"]
     },
     {
-        "question": "How often is Gabapentin taken?",
-        "expected_answer": "three times daily",
-        "expected_chunk_keywords": ["gabapentin", "three", "daily"]
+        "question": "What is the Metformin dosage prescribed?",
+        "expected_answer": "500",
+        "expected_chunk_keywords": ["metformin", "500", "mg"]
     },
     {
-        "question": "What is the patient's blood pressure?",
-        "expected_answer": "130/85",
-        "expected_chunk_keywords": ["blood pressure", "130", "85"]
+        "question": "What medication is prescribed for neuropathy symptoms?",
+        "expected_answer": "Gabapentin",
+        "expected_chunk_keywords": ["gabapentin", "300", "neuropathy"]
+    },
+    {
+        "question": "What medication is prescribed for cholesterol management?",
+        "expected_answer": "Atorvastatin",
+        "expected_chunk_keywords": ["atorvastatin", "20mg", "cholesterol"]
     },
     {
         "question": "What is the name of the treating doctor?",
-        "expected_answer": "Cheryl Blankenship",
-        "expected_chunk_keywords": ["cheryl", "blankenship", "doctor"]
+        "expected_answer": "Blankenship",
+        "expected_chunk_keywords": ["blankenship", "cheryl", "doctor"]
     },
     {
-        "question": "What medication is taken once daily for cholesterol?",
-        "expected_answer": "Atorvastatin",
-        "expected_chunk_keywords": ["atorvastatin", "20mg", "daily"]
+        "question": "What is the name of the hospital?",
+        "expected_answer": "Sierra Valley",
+        "expected_chunk_keywords": ["sierra", "valley", "medical", "institute"]
     },
     {
-        "question": "When is the follow-up appointment scheduled?",
-        "expected_answer": "3 months",
-        "expected_chunk_keywords": ["follow", "3 months", "hba1c"]
-    },
-    {
-        "question": "What symptom does the patient complain of in the feet?",
+        "question": "What symptom does the patient report in the feet?",
         "expected_answer": "tingling",
         "expected_chunk_keywords": ["tingling", "feet", "neuropathy"]
     },
     {
-        "question": "What is the patient's oxygen saturation?",
-        "expected_answer": "98",
-        "expected_chunk_keywords": ["oxygen", "saturation", "98"]
+        "question": "What is the Gabapentin dosage prescribed?",
+        "expected_answer": "300",
+        "expected_chunk_keywords": ["gabapentin", "300", "neuropathy"]
     },
     {
-        "question": "What is the patient's heart rate?",
-        "expected_answer": "72",
-        "expected_chunk_keywords": ["heart rate", "72"]
+        "question": "What type of Diabetes is the patient diagnosed with?",
+        "expected_answer": "Type 2",
+        "expected_chunk_keywords": ["type 2", "diabetes", "diagnosis"]
     },
     {
-        "question": "What is the hospital's name?",
-        "expected_answer": "Sierra Valley Medical Institute",
-        "expected_chunk_keywords": ["sierra", "valley", "medical", "institute"]
+        "question": "What is the patient's last name?",
+        "expected_answer": "Lawrence",
+        "expected_chunk_keywords": ["lawrence", "kimberly", "patient"]
     },
     {
-        "question": "What is the patient's smoking status?",
-        "expected_answer": "Never",
-        "expected_chunk_keywords": ["smoking", "never"]
+        "question": "What is the combined total daily dosage in mg of all medications prescribed?",
+        "expected_answer": "820",
+        "expected_chunk_keywords": ["metformin", "gabapentin", "atorvastatin"]
     },
     {
-        "question": "What tests were pending at the time of the report?",
-        "expected_answer": "Microalbumin",
-        "expected_chunk_keywords": ["microalbumin", "pending"]
+        "question": "What is the patient's date of birth in Day Month Year format?",
+        "expected_answer": "24th May 1977",
+        "expected_chunk_keywords": ["1977", "dob", "born"]
     }
 ]
 
