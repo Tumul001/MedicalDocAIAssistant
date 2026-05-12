@@ -1,38 +1,32 @@
-import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { AlertCircle, X } from 'lucide-react';
 
 /**
  * ErrorAlert.jsx
- * Dismissible red alert box for error messages.
+ * Premium dismissible error toast with animation.
  */
 export default function ErrorAlert({ message, onDismiss }) {
-  const [visible, setVisible] = useState(true);
-
-  if (!visible || !message) return null;
-
-  const dismiss = () => {
-    setVisible(false);
-    onDismiss?.();
-  };
+  if (!message) return null;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
       id="error-alert"
-      className="flex items-start gap-3 p-4 rounded-xl bg-red-900/30 border border-red-700/50 text-red-400"
+      className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 backdrop-blur-xl"
     >
-      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <p className="flex-1 text-sm leading-relaxed">{message}</p>
-      <button
-        onClick={dismiss}
-        className="text-red-500 hover:text-red-300 transition-colors flex-shrink-0"
-        aria-label="Dismiss error"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
+      <AlertCircle size={16} className="text-rose-400 flex-shrink-0 mt-0.5" />
+      <p className="flex-1 text-sm text-rose-300 leading-relaxed">{message}</p>
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          className="text-rose-400 hover:text-rose-300 transition-colors flex-shrink-0 p-0.5"
+          aria-label="Dismiss error"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </motion.div>
   );
 }

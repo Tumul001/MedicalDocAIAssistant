@@ -1,11 +1,8 @@
 import { useRef, useState } from 'react';
 import ErrorAlert from './ErrorAlert';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FileText, UploadCloud, CheckCircle2, X, Loader2, FileCheck, Shield } from 'lucide-react';
 
-/**
- * UploadCard.jsx
- * Drag-and-drop PDF upload with fallback file input.
- * Shows upload progress and error states.
- */
 export default function UploadCard({ onUpload, isLoading }) {
   const fileInputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -15,131 +12,111 @@ export default function UploadCard({ onUpload, isLoading }) {
   const handleFile = (file) => {
     if (!file) return;
     setError(null);
-    if (file.type !== 'application/pdf') {
-      setError('Only PDF files are accepted.');
-      return;
-    }
-    if (file.size > 20 * 1024 * 1024) {
-      setError('File too large. Maximum size is 20MB.');
-      return;
-    }
+    const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPDF) { setError('Only PDF files are accepted.'); return; }
+    if (file.size > 20 * 1024 * 1024) { setError('File too large. Maximum size is 20MB.'); return; }
     setSelectedFile(file);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    handleFile(file);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setDragging(true);
-  };
-
+  const handleDrop = (e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); };
+  const handleDragOver = (e) => { e.preventDefault(); setDragging(true); };
   const handleDragLeave = () => setDragging(false);
+  const handleInputChange = (e) => handleFile(e.target.files[0]);
+  const handleUpload = () => { if (selectedFile && !isLoading) onUpload(selectedFile); };
 
-  const handleInputChange = (e) => {
-    handleFile(e.target.files[0]);
-  };
-
-  const handleUpload = () => {
-    if (selectedFile && !isLoading) {
-      onUpload(selectedFile);
-    }
+  const formatSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
     <div className="space-y-4">
-      {/* Client-side validation error */}
-      {error && (
-        <ErrorAlert message={error} onDismiss={() => setError(null)} />
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+            <ErrorAlert message={error} onDismiss={() => setError(null)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Drop zone */}
-      <div
-        id="pdf-dropzone"
+      <motion.div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => !selectedFile && fileInputRef.current?.click()}
         className={`
-          relative cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center
-          transition-all duration-200
+          relative cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center
+          transition-all duration-300 overflow-hidden group
           ${dragging
-            ? 'border-medical-500 bg-medical-900/20 scale-[1.01]'
+            ? 'border-cyan-400 bg-cyan-500/[0.06] shadow-[0_0_40px_-10px_rgba(6,182,212,0.2)]'
             : selectedFile
-              ? 'border-emerald-600/60 bg-emerald-900/10'
-              : 'border-slate-700 hover:border-medical-600/60 hover:bg-medical-900/10 bg-slate-900/40'
+              ? 'border-emerald-500/30 bg-emerald-500/[0.04]'
+              : 'border-white/[0.08] bg-white/[0.02] hover:border-cyan-500/30 hover:bg-white/[0.04]'
           }
         `}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf"
-          className="hidden"
-          id="pdf-file-input"
-          onChange={handleInputChange}
-        />
+        <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleInputChange} />
 
-        {selectedFile ? (
-          <div className="space-y-2">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-emerald-900/40 border border-emerald-700/50 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-emerald-400">{selectedFile.name}</p>
-            <p className="text-xs text-slate-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
-            <button
-              onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-              className="text-xs text-slate-500 hover:text-slate-300 transition-colors underline"
-            >
-              Change file
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center">
-              <svg className="w-7 h-7 text-medical-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-200">Drop your PDF here</p>
-              <p className="text-xs text-slate-500 mt-1">or click to browse — PDF files only</p>
-            </div>
-          </div>
-        )}
-      </div>
+        {dragging && <div className="animate-shimmer pointer-events-none" />}
 
-      {/* Upload button */}
+        <AnimatePresence mode="wait">
+          {selectedFile ? (
+            <motion.div key="selected" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <FileCheck size={24} />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-white">{selectedFile.name}</p>
+                <p className="text-xs text-gray-500 mt-1">{formatSize(selectedFile.size)} • Ready for analysis</p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-rose-400 transition-colors"
+              >
+                <X size={12} /> Remove
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div key="placeholder" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-cyan-400 group-hover:text-cyan-300 group-hover:border-cyan-500/20 transition-all">
+                <UploadCloud size={24} />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-white">Upload Medical Record</p>
+                <p className="text-sm text-gray-500 mt-1">Drag & drop a PDF or click to browse</p>
+              </div>
+              <div className="flex justify-center gap-4">
+                <span className="text-[11px] text-gray-600 font-medium">PDF only</span>
+                <span className="text-gray-800">•</span>
+                <span className="text-[11px] text-gray-600 font-medium">Max 20MB</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
       <button
         id="upload-submit-btn"
         onClick={handleUpload}
         disabled={!selectedFile || isLoading}
-        className={`
-          w-full py-3 px-6 rounded-xl font-semibold text-sm transition-all duration-200
+        className={`btn w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-200
           ${selectedFile && !isLoading
-            ? 'gradient-medical text-white shadow-lg shadow-medical-900/50 hover:opacity-90 active:scale-95'
-            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-          }
-        `}
+            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 hover:brightness-110 active:scale-[0.98]'
+            : 'bg-white/[0.04] text-gray-600 border border-white/[0.06] cursor-not-allowed'
+          }`}
       >
         {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            Processing document…
-          </span>
-        ) : 'Upload & Process PDF'}
+          <>
+            <Loader2 className="animate-spin" size={16} />
+            Processing Document...
+          </>
+        ) : (
+          <>
+            <FileText size={16} />
+            Analyze Document
+          </>
+        )}
       </button>
     </div>
   );

@@ -1,73 +1,118 @@
+import { motion } from 'framer-motion';
+import { User, Stethoscope, ShieldCheck, ChevronRight, FileText, Copy, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useState } from 'react';
-import ConfidenceBadge from './ConfidenceBadge';
-import SourceCard from './SourceCard';
 
-/**
- * ChatBubble.jsx
- * Renders a single chat message.
- * - User messages: right-aligned blue bubble
- * - Assistant messages: left-aligned with confidence badge + collapsible sources
- */
 export default function ChatBubble({ message }) {
-  const [sourcesOpen, setSourcesOpen] = useState(false);
-  const isUser = message.role === 'user';
+  const isAssistant = message.role === 'assistant';
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  let confidenceLevel = null;
+  let displayScore = null;
+
+  if (message.confidence) {
+    if (typeof message.confidence === 'object' && message.confidence !== null) {
+      confidenceLevel = message.confidence.level?.toLowerCase() || 'low';
+      // Normalize raw score (0.0 to ~0.55) to a 0-100% scale that looks right to users
+      const rawScore = message.confidence.score || 0;
+      if (confidenceLevel === 'high') {
+        displayScore = Math.min(99, Math.max(85, Math.round((rawScore / 0.5) * 100)));
+      } else if (confidenceLevel === 'medium') {
+        displayScore = Math.min(84, Math.max(50, Math.round((rawScore / 0.3) * 100)));
+      } else {
+        displayScore = Math.min(49, Math.max(10, Math.round((rawScore / 0.2) * 100)));
+      }
+    } else {
+      const numConf = Number(message.confidence);
+      if (!isNaN(numConf)) {
+        confidenceLevel = numConf >= 0.8 ? 'high' : numConf >= 0.5 ? 'medium' : 'low';
+        displayScore = Math.round(numConf * 100);
+      }
+    }
+  }
+
+  const confidenceColors = {
+    high: 'badge-emerald',
+    medium: 'badge-amber',
+    low: 'badge-rose',
+  };
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`max-w-[85%] ${isUser ? 'order-2' : 'order-1'}`}>
-        {/* Avatar */}
-        {!isUser && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-full gradient-medical flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-            </div>
-            <span className="text-xs text-slate-400 font-medium">Medical AI</span>
-          </div>
-        )}
-
-        {/* Bubble */}
-        <div className={`rounded-2xl px-4 py-3 ${
-          isUser
-            ? 'bg-medical-600 text-white rounded-tr-sm'
-            : 'glass text-slate-200 rounded-tl-sm border border-slate-700/50'
-        }`}>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'} gap-2`}
+    >
+      {/* Header */}
+      <div className={`flex items-center gap-2 px-1 ${isAssistant ? 'flex-row' : 'flex-row-reverse'}`}>
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center 
+          ${isAssistant 
+            ? 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 text-cyan-400' 
+            : 'bg-white/[0.06] border border-white/[0.08] text-gray-400'
+          }`}>
+          {isAssistant ? <Stethoscope size={13} /> : <User size={13} />}
         </div>
-
-        {/* Confidence badge (assistant only) */}
-        {!isUser && message.confidence && (
-          <div className="mt-2 ml-1">
-            <ConfidenceBadge level={message.confidence.level} score={message.confidence.score} />
-          </div>
-        )}
-
-        {/* Sources toggle (assistant only) */}
-        {!isUser && message.sources && message.sources.length > 0 && (
-          <div className="mt-2 ml-1">
-            <button
-              id={`sources-toggle-${message.id}`}
-              onClick={() => setSourcesOpen(!sourcesOpen)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              <svg className={`w-3.5 h-3.5 transition-transform ${sourcesOpen ? 'rotate-90' : ''}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              {message.sources.length} source{message.sources.length !== 1 ? 's' : ''} retrieved
-            </button>
-            {sourcesOpen && (
-              <div className="mt-2 space-y-2">
-                {message.sources.map(src => (
-                  <SourceCard key={src.chunk_id} chunk={src} />
-                ))}
-              </div>
-            )}
+        <span className="text-[11px] font-medium text-gray-500">
+          {isAssistant ? 'MedAssist AI' : 'You'}
+        </span>
+        {isAssistant && confidenceLevel && displayScore !== null && (
+          <div className={`${confidenceColors[confidenceLevel]} py-0.5 text-[9px]`}>
+            <ShieldCheck size={9} />
+            {displayScore}%
           </div>
         )}
       </div>
-    </div>
+
+      {/* Message Body */}
+      <div className={`max-w-[85%] relative group
+        ${isAssistant 
+          ? 'bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-tl-sm px-5 py-4' 
+          : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5'
+        }`}>
+        
+        {isAssistant ? (
+          <div className="prose-ai">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <p className="text-sm leading-relaxed font-medium">{message.content}</p>
+        )}
+
+        {/* Sources */}
+        {isAssistant && message.sources?.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-white/[0.06]">
+            <p className="label text-[9px] mb-2.5">Referenced Sources</p>
+            <div className="flex flex-wrap gap-2">
+              {message.sources.map((source, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:border-cyan-500/20 transition-all cursor-pointer group/source text-[10px]">
+                  <FileText size={10} className="text-cyan-500" />
+                  <span className="font-medium text-gray-400 group-hover/source:text-white transition-colors">Page {source.page}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Copy button for assistant messages */}
+        {isAssistant && (
+          <button 
+            onClick={handleCopy}
+            className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-gray-600 hover:text-white hover:bg-white/[0.08] opacity-0 group-hover:opacity-100 transition-all"
+          >
+            {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          </button>
+        )}
+      </div>
+    </motion.div>
   );
 }

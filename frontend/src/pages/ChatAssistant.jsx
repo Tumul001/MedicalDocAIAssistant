@@ -1,173 +1,307 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDocument } from '../context/DocumentContext';
-import { sendChatMessage } from '../services/api';
+import { sendChatMessage, getSuggestedQuestions } from '../services/api';
 import ChatBubble from '../components/ChatBubble';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorAlert from '../components/ErrorAlert';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Send, Sparkles, Trash2, Stethoscope, Activity, ShieldCheck,
+  ArrowUp, ChevronRight, CheckCircle2, MessageSquare, Brain,
+  FileText, HelpCircle, MoreHorizontal
+} from 'lucide-react';
 
-/**
- * ChatAssistant.jsx
- * - Medical Q&A chat interface
- * - Shows confidence + source evidence per answer
- * - Guards: requires document uploaded first
- */
 export default function ChatAssistant() {
   const navigate = useNavigate();
-  const { documentLoaded, chatHistory, addChatMessage } = useDocument();
+  const { 
+    documentLoaded, chatHistory, addChatMessage, clearChatHistory,
+    suggestedQuestions, setSuggestedQuestions
+  } = useDocument();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [fetchingQuestions, setFetchingQuestions] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Auto-scroll to bottom
+  useEffect(() => {
+    const loadQuestions = async () => {
+      if (documentLoaded && suggestedQuestions.length === 0 && !fetchingQuestions) {
+        setFetchingQuestions(true);
+        try {
+          const questions = await getSuggestedQuestions();
+          if (questions?.length > 0) setSuggestedQuestions(questions);
+        } catch (err) {
+          console.error("Failed to fetch suggested questions:", err);
+        } finally {
+          setFetchingQuestions(false);
+        }
+      }
+    };
+    loadQuestions();
+  }, [documentLoaded, suggestedQuestions.length, fetchingQuestions, setSuggestedQuestions]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, loading]);
 
-  const handleSend = async () => {
-    const q = input.trim();
-    if (!q || loading) return;
+  const handleSendMessage = async (textToSubmit) => {
+    const finalInput = (typeof textToSubmit === 'string' ? textToSubmit : input).trim();
+    if (!finalInput || loading) return;
 
-    const userMsg = { id: Date.now(), role: 'user', content: q };
+    const userMsg = { id: Date.now(), role: 'user', content: finalInput };
     addChatMessage(userMsg);
-    setInput('');
+    if (typeof textToSubmit !== 'string') setInput('');
+    
     setLoading(true);
     setError(null);
 
     try {
-      const res = await sendChatMessage(q);
-      const assistantMsg = {
+      const res = await sendChatMessage(finalInput);
+      addChatMessage({
         id: Date.now() + 1,
         role: 'assistant',
         content: res.answer,
         confidence: res.confidence,
         sources: res.sources,
-      };
-      addChatMessage(assistantMsg);
+      });
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to get response. Try again.');
+      setError(err?.response?.data?.detail || 'Failed to get response.');
     } finally {
       setLoading(false);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
   };
 
-  // Guard: document not loaded
+  const FALLBACK_QUESTIONS = [
+    'What are the key clinical findings in this document?',
+    'Are there any critical lab values or abnormalities?',
+    'List all prescribed medications and dosages.',
+    'What follow-up care is recommended?',
+    'Identify potential drug interactions.',
+  ];
+
+  const questionsToDisplay = suggestedQuestions.length > 0 ? suggestedQuestions : FALLBACK_QUESTIONS;
+
   if (!documentLoaded) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="glass rounded-2xl p-10 border border-slate-700/40 text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center">
-            <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
+      <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center px-4">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card w-full p-12">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-gray-600 mx-auto mb-6">
+            <MessageSquare size={28} />
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-300">No Document Loaded</h2>
-            <p className="text-sm text-slate-500 mt-1">Please upload a medical PDF first to start asking questions.</p>
-          </div>
-          <button
-            id="go-upload-btn"
-            onClick={() => navigate('/')}
-            className="px-6 py-2.5 rounded-xl gradient-medical text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            Upload Document →
+          <h2 className="heading-page mb-3">AI Assistant</h2>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            Upload a medical document first to start asking clinical questions.
+          </p>
+          <button onClick={() => navigate('/')} className="btn-primary w-full">
+            <FileText size={16} />
+            Upload Document
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-white">Chat Assistant</h1>
-        <p className="text-slate-400 text-sm mt-1">Ask medical questions grounded in your uploaded document</p>
-      </div>
+    <div className="flex h-full gap-6">
+      {/* ── Chat Main Area ── */}
+      <div className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <Stethoscope size={18} />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">Clinical Assistant</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="badge-emerald py-0.5 text-[10px]">
+                  <div className="w-1 h-1 rounded-full bg-emerald-400" />
+                  Online
+                </div>
+                <div className="badge-cyan py-0.5 text-[10px]">RAG Active</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={clearChatHistory} 
+              className="btn-icon hover:text-rose-400 hover:border-rose-500/20"
+              title="Clear chat"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        </div>
 
-      {/* Chat history */}
-      <div className="flex-1 overflow-y-auto space-y-1 pr-1 mb-4">
-        {chatHistory.length === 0 && (
-          <div className="text-center py-12 space-y-3">
-            <p className="text-slate-500 text-sm">No messages yet. Ask a medical question below.</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {[
-                'What diseases are mentioned?',
-                'What medications are prescribed?',
-                'What lab values are abnormal?',
-                'What follow-up is recommended?',
-              ].map(q => (
+        {/* Conversation Area */}
+        <div className="flex-1 card p-0 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 scrollbar-thin">
+            <AnimatePresence initial={false}>
+              {chatHistory.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full py-12 px-4">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center text-center max-w-md"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-violet-500/10 border border-white/[0.06] flex items-center justify-center text-gray-500 mb-5">
+                      <Brain size={24} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-1.5">Start a Conversation</h3>
+                    <p className="text-sm text-gray-500 mb-8">Ask clinical questions about the uploaded document.</p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                      {questionsToDisplay.slice(0, 4).map((text, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSendMessage(text)}
+                          className="card-interactive p-4 text-left"
+                        >
+                          <p className="text-xs font-medium text-gray-300 leading-relaxed line-clamp-2">{text}</p>
+                          <div className="flex items-center gap-1.5 mt-2.5 text-[10px] font-medium text-gray-600 group-hover:text-cyan-400 transition-colors">
+                            Ask this <ChevronRight size={10} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </div>
+              ) : (
+                chatHistory.map(msg => <ChatBubble key={msg.id} message={msg} />)
+              )}
+            </AnimatePresence>
+            
+            {loading && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-tl-sm px-5 py-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                      {[0, 0.15, 0.3].map((delay, i) => (
+                        <motion.div key={i} animate={{ scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.8, delay }} className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      ))}
+                    </div>
+                    <span className="text-[11px] font-medium text-gray-500">Analyzing records...</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="p-4 bg-white/[0.01] border-t border-white/[0.06]">
+            <AnimatePresence>
+              {error && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-3">
+                  <ErrorAlert message={error} onDismiss={() => setError(null)} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <div className="relative group/input">
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-violet-500/10 rounded-2xl blur-xl opacity-0 group-focus-within/input:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <div className="relative flex items-end gap-3 bg-white/[0.03] border border-white/[0.08] rounded-2xl p-3 focus-within:border-cyan-500/30 transition-all duration-300">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask a clinical question..."
+                  rows={1}
+                  className="flex-1 bg-transparent text-gray-100 placeholder-gray-600 resize-none outline-none text-sm leading-relaxed py-1.5 px-1 min-h-[32px] max-h-[120px]"
+                />
                 <button
-                  key={q}
-                  onClick={() => setInput(q)}
-                  className="text-xs px-3 py-1.5 rounded-full glass border border-slate-700/50 text-slate-400 hover:text-slate-200 hover:border-medical-600/50 transition-all"
+                  type="button"
+                  onClick={() => handleSendMessage()}
+                  disabled={!input.trim() || loading}
+                  className={`p-2.5 rounded-xl transition-all duration-200 flex-shrink-0
+                    ${input.trim() && !loading
+                      ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20 hover:bg-cyan-400 active:scale-95'
+                      : 'bg-white/[0.04] text-gray-600'
+                    }`}
                 >
-                  {q}
+                  <Send size={16} />
                 </button>
-              ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-2.5 px-1">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-medium">
+                  <Activity size={10} /> Online
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-medium">
+                  <ShieldCheck size={10} /> Verified Sources
+                </div>
+              </div>
+              <div className="text-[10px] text-gray-700 font-medium">
+                Enter to send • Shift+Enter for newline
+              </div>
             </div>
           </div>
-        )}
-        {chatHistory.map(msg => (
-          <ChatBubble key={msg.id} message={msg} />
-        ))}
-        {loading && (
-          <div className="flex justify-start mb-4">
-            <div className="glass rounded-2xl rounded-tl-sm border border-slate-700/50 px-4 py-3">
-              <LoadingSpinner size="sm" label="Analyzing medical context…" />
-            </div>
+        </div>
+      </div>
+
+      {/* ── Sidebar Context Panel ── */}
+      <aside className="hidden xl:flex flex-col w-72 gap-4 h-full flex-shrink-0">
+        <div className="card p-5 flex flex-col gap-4">
+          <h3 className="label">Assistant Configuration</h3>
+          <div className="space-y-3">
+            {[
+              { label: 'Model', value: 'Llama 3.3 70B', icon: <Brain size={13} className="text-cyan-400" /> },
+              { label: 'Retrieval', value: 'Hybrid RAG', icon: <Activity size={13} className="text-emerald-400" /> },
+              { label: 'Verification', value: 'Evidence-based', icon: <ShieldCheck size={13} className="text-violet-400" /> },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
+                  {item.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-gray-600 font-medium">{item.label}</p>
+                  <p className="text-xs font-semibold text-gray-300 truncate">{item.value}</p>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+        </div>
 
-      {/* Error */}
-      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
-
-      {/* Input area */}
-      <div className="glass rounded-2xl border border-slate-700/40 p-3 flex gap-2 items-end">
-        <textarea
-          ref={inputRef}
-          id="chat-input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask a medical question…"
-          rows={1}
-          className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-500 resize-none outline-none max-h-36 overflow-y-auto leading-relaxed"
-          style={{ minHeight: '36px' }}
-        />
-        <button
-          id="chat-send-btn"
-          onClick={handleSend}
-          disabled={!input.trim() || loading}
-          className={`
-            p-2.5 rounded-xl transition-all duration-200
-            ${input.trim() && !loading
-              ? 'gradient-medical text-white shadow-lg hover:opacity-90 active:scale-95'
-              : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700'
-            }
-          `}
-          aria-label="Send message"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
-      </div>
-
-      <p className="text-xs text-slate-600 text-center mt-2">Press Enter to send · Shift+Enter for new line</p>
+        <div className="card p-5 flex-1 flex flex-col min-h-0">
+          <div className="flex items-center gap-2 mb-4">
+            <HelpCircle size={13} className="text-cyan-400" />
+            <h3 className="label">Suggested Questions</h3>
+          </div>
+          <div className="space-y-2 flex-1 overflow-y-auto scrollbar-thin pr-1">
+            {fetchingQuestions ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2 text-gray-600">
+                <LoadingSpinner size="sm" label="" />
+                <p className="text-[10px] font-medium">Generating questions...</p>
+              </div>
+            ) : (
+              questionsToDisplay.map((text, i) => (
+                <button 
+                  key={i}
+                  onClick={() => handleSendMessage(text)}
+                  disabled={loading}
+                  className="w-full text-left p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-[11px] text-gray-400 hover:text-white hover:bg-white/[0.05] hover:border-cyan-500/20 transition-all duration-200 leading-relaxed group cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex-1 line-clamp-2">{text}</span>
+                    <ChevronRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }

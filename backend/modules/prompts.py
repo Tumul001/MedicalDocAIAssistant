@@ -40,3 +40,16 @@ Rules:
 
 Medical Document:
 {document_text}"""
+
+QUESTIONS_GENERATION_PROMPT = """You are a clinical analysis auditor. 
+Based on the medical document provided, generate 5 highly specific and clinically relevant questions that a practitioner should ask about this specific patient's case.
+
+Rules:
+- Questions must be directly related to findings, medications, or risks mentioned in the text.
+- Do NOT ask generic questions; use specific patient data points.
+- Format the output as a simple JSON array of strings.
+- Example: ["What is the patient's reaction to the increased dosage of Lisinopril?", "Are the abnormal findings in the CBC related to the current infection?"]
+- Output ONLY the JSON array.
+
+Medical Document:
+{document_text}"""

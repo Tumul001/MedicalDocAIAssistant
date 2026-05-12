@@ -9,9 +9,14 @@ export const DocumentProvider = ({ children }) => {
   const [summary, setSummary] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
 
   const addChatMessage = (message) => {
     setChatHistory(prev => [...prev, message]);
+  };
+
+  const clearChatHistory = () => {
+    setChatHistory([]);
   };
 
   const clearAll = () => {
@@ -19,16 +24,18 @@ export const DocumentProvider = ({ children }) => {
     setUploadMeta(null);
     setChatHistory([]);
     setSummary(null);
+    setSuggestedQuestions([]);
   };
 
   return (
     <DocumentContext.Provider value={{
       documentLoaded, setDocumentLoaded,
       uploadMeta, setUploadMeta,
-      chatHistory, addChatMessage,
+      chatHistory, addChatMessage, clearChatHistory,
       summary, setSummary,
       isUploading, setIsUploading,
       uploadError, setUploadError,
+      suggestedQuestions, setSuggestedQuestions,
       clearAll
     }}>
       {children}

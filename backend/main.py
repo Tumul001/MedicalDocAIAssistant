@@ -17,7 +17,7 @@ from modules.embeddings import embed_texts
 from modules.vector_store import build_index, initialize_store
 from modules.hybrid_retrieval import build_bm25
 from modules.rag_pipeline import run_rag
-from modules.medical_summary import get_medical_summary, set_document_text
+from modules.medical_summary import get_medical_summary, set_document_text, get_suggested_questions
 from typing import List
 import uvicorn
 
@@ -118,6 +118,12 @@ async def chat(request: ChatRequest):
 @app.get("/summary", response_model=MedicalSummary)
 async def get_summary():
     return get_medical_summary()
+
+
+@app.get("/questions", response_model=List[str])
+async def get_questions():
+    """Return dynamically generated clinical questions for the document."""
+    return get_suggested_questions()
 
 
 @app.get("/sources", response_model=List[SourceChunk])

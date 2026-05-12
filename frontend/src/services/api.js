@@ -31,3 +31,8 @@ export const getHealth = async () => {
   const res = await API.get('/health');
   return res.data;
 };
+
+export const getSuggestedQuestions = async () => {
+  const res = await API.get('/questions');
+  return res.data;
+};
