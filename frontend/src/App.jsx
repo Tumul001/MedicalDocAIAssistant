@@ -7,6 +7,7 @@ import ChatAssistant from './pages/ChatAssistant';
 import MedicalSummary from './pages/MedicalSummary';
 import EvidenceViewer from './pages/EvidenceViewer';
 import Analytics from './pages/Analytics';
+import VoiceAssistantPage from './pages/VoiceAssistant';
 
 function App() {
   return (
@@ -15,12 +16,13 @@ function App() {
         <BrowserRouter>
           <MainLayout>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/chat" element={<ChatAssistant />} />
-              <Route path="/summary" element={<MedicalSummary />} />
+              <Route path="/"         element={<Dashboard />} />
+              <Route path="/chat"     element={<ChatAssistant />} />
+              <Route path="/voice"    element={<VoiceAssistantPage />} />
+              <Route path="/summary"  element={<MedicalSummary />} />
               <Route path="/evidence" element={<EvidenceViewer />} />
               <Route path="/analytics" element={<Analytics />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*"         element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>
         </BrowserRouter>

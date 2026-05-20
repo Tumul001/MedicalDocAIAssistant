@@ -4,7 +4,7 @@ FastAPI application entry point.
 Registers all routes and middleware.
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from modules.entities import (
     ChatRequest, ChatResponse, UploadResponse,
@@ -18,6 +18,7 @@ from modules.vector_store import build_index, initialize_store
 from modules.hybrid_retrieval import build_bm25
 from modules.rag_pipeline import run_rag
 from modules.medical_summary import get_medical_summary, set_document_text, get_suggested_questions
+from modules.voice_handler import handle_voice_websocket
 from typing import List
 import uvicorn
 
@@ -146,6 +147,17 @@ async def get_sources(query: str = ""):
         )
         for c in top
     ]
+
+
+# ── Voice WebSocket endpoint ─────────────────────────────────────────────────
+@app.websocket("/ws/voice")
+async def voice_chat(websocket: WebSocket):
+    """
+    Live multilingual voice chat endpoint.
+    Bridges browser audio → Sarvam STT → RAG → Sarvam TTS → browser audio.
+    See modules/voice_handler.py for full documentation.
+    """
+    await handle_voice_websocket(websocket)
 
 
 if __name__ == "__main__":

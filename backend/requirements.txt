@@ -13,3 +13,4 @@ groq==1.2.0
 httpx==0.28.1
 numpy==2.4.4
 pillow==12.2.0
+websockets==13.1

@@ -1,74 +1,69 @@
-import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
-export default function SummarySection({ title, items, icon, color = 'cyan' }) {
+export default function SummarySection({ title, items, icon, color }) {
   const [expanded, setExpanded] = useState(true);
   
-  const colorMap = {
-    cyan:    { badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',    dot: 'bg-cyan-400',    glow: 'hover:shadow-[0_0_24px_-8px_rgba(6,182,212,0.2)]' },
-    emerald: { badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400', glow: 'hover:shadow-[0_0_24px_-8px_rgba(16,185,129,0.2)]' },
-    amber:   { badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',   dot: 'bg-amber-400',   glow: 'hover:shadow-[0_0_24px_-8px_rgba(245,158,11,0.2)]' },
-    rose:    { badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',     dot: 'bg-rose-400',    glow: 'hover:shadow-[0_0_24px_-8px_rgba(244,63,94,0.2)]' },
-    violet:  { badge: 'bg-violet-500/10 text-violet-400 border-violet-500/20',  dot: 'bg-violet-400',  glow: 'hover:shadow-[0_0_24px_-8px_rgba(139,92,246,0.2)]' },
+  if (!items || items.length === 0) return null;
+
+  const colorStyles = {
+    rose:    { bg: 'bg-rose-500/10',    text: 'text-rose-400',    border: 'border-rose-500/20' },
+    cyan:    { bg: 'bg-cyan-500/10',    text: 'text-cyan-400',    border: 'border-cyan-500/20' },
+    amber:   { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20' },
+    violet:  { bg: 'bg-violet-500/10',  text: 'text-violet-400',  border: 'border-violet-500/20' },
+    emerald: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
   };
 
-  const c = colorMap[color] || colorMap.cyan;
-  const count = items?.length || 0;
+  const cs = colorStyles[color] || colorStyles.cyan;
 
   return (
-    <div className={`card transition-all duration-300 ${c.glow}`}>
-      {/* Header */}
+    <div className={`card overflow-hidden border ${cs.border} bg-white/[0.02]`}>
       <button 
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center flex-shrink-0">
+          <div className={`w-8 h-8 rounded-xl ${cs.bg} flex items-center justify-center ${cs.text}`}>
             {icon}
           </div>
-          <div className="text-left">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-          </div>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${c.badge}`}>
-            {count}
+          <h3 className="text-sm font-semibold text-white">{title}</h3>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cs.bg} ${cs.text}`}>
+            {items.length}
           </span>
-          {expanded ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
+        </div>
+        <div className="text-gray-500">
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
 
-      {/* Items */}
-      <motion.div 
-        initial={false}
-        animate={{ height: expanded ? 'auto' : 0, opacity: expanded ? 1 : 0 }}
-        transition={{ duration: 0.25 }}
-        className="overflow-hidden"
-      >
-        <div className="px-4 pb-4 pt-1">
-          {count > 0 ? (
-            <ul className="space-y-2.5">
-              {items.map((item, i) => (
-                <motion.li 
-                  key={i} 
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="flex items-start gap-3 group/item"
-                >
-                  <div className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot} opacity-60 group-hover/item:opacity-100 transition-opacity`} />
-                  <span className="text-sm text-gray-400 leading-relaxed group-hover/item:text-gray-200 transition-colors">
-                    {item}
-                  </span>
-                </motion.li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-gray-600 italic text-center py-3">No data found</p>
-          )}
-        </div>
-      </motion.div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 pt-0 border-t border-white/[0.04]">
+              <ul className="space-y-3 mt-4">
+                {items.map((item, i) => (
+                  <motion.li 
+                    key={i}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-start gap-3"
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${cs.text} bg-current mt-1.5 flex-shrink-0`} />
+                    <span className="text-sm text-gray-300 leading-relaxed">{item}</span>
+                  </motion.li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -4,11 +4,8 @@ const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check local storage or system preference on load
-    const saved = localStorage.getItem('theme');
-    if (saved) {
-      return saved === 'dark';
-    }
+    const saved = localStorage.getItem('medassist-theme');
+    if (saved) return saved === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
@@ -17,17 +14,17 @@ export function ThemeProvider({ children }) {
     if (isDarkMode) {
       root.classList.add('dark');
       root.classList.remove('light-theme');
-      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('medassist-theme', 'dark');
     } else {
       root.classList.remove('dark');
       root.classList.add('light-theme');
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('medassist-theme', 'light');
     }
+    // Smooth transition on all elements
+    root.style.transition = 'background-color 0.35s ease, color 0.35s ease';
   }, [isDarkMode]);
 
-  const toggleTheme = () => {
-    setIsDarkMode(prev => !prev);
-  };
+  const toggleTheme = () => setIsDarkMode(prev => !prev);
 
   return (
     <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>

@@ -83,7 +83,7 @@ export default function Analytics() {
   const totalMessages = chatHistory.length;
   const aiResponses = chatHistory.filter(m => m.role === 'assistant').length;
   const avgConfidence = aiResponses > 0
-    ? chatHistory.filter(m => m.role === 'assistant' && m.confidence).reduce((s, m) => s + m.confidence, 0) / aiResponses
+    ? chatHistory.filter(m => m.role === 'assistant' && m.confidence).reduce((s, m) => s + (m.confidence.score || 0), 0) / aiResponses
     : 0;
 
   const summaryCategories = summary 
@@ -91,14 +91,14 @@ export default function Analytics() {
     : 0;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 px-6 md:px-10 pt-8 pb-12 max-w-7xl mx-auto">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
         <div className="badge-violet">
           <BarChart3 size={12} />
           <span>AI Observability</span>
         </div>
-        <h1 className="heading-display text-3xl sm:text-4xl lg:text-5xl">
+        <h1 className="heading-display">
           Analytics Dashboard
         </h1>
         <p className="text-gray-400 text-sm max-w-lg leading-relaxed">

@@ -88,4 +88,15 @@ def compute_confidence(chunks: List[Dict], answer: str = "") -> Dict:
         if grounding < 0.30 and level == "High":
             level = "Medium"
 
-    return {"level": level, "score": round(top_score, 4)}
+    # Normalize score for UI display (0.0 - 1.0)
+    if level == "High":
+        # Map to 85% - 99%
+        ui_score = 0.85 + (min(top_score, 1.0) * 0.14)
+    elif level == "Medium":
+        # Map to 60% - 84%
+        ui_score = 0.60 + (min(top_score, 1.0) * 0.24)
+    else:
+        # Map to 10% - 59%
+        ui_score = max(0.10, top_score)
+
+    return {"level": level, "score": round(ui_score, 4)}
