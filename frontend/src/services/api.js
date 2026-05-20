@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: 'http://127.0.0.1:8000',
   timeout: 120000,  // 2 minutes for LLM responses
 });
 
