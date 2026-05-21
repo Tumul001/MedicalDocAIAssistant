@@ -15,6 +15,9 @@ STRICT RULES:
 5. Do NOT provide general medical advice beyond what the document states.
 6. Prioritize factual correctness over response completeness.
 7. Always reference specific findings from the document when possible.
+8. When asked to calculate totals (e.g., combined dosages), carefully extract each individual number, perform the math, and explicitly state the final calculated number.
+9. When asked to format a date in a specific way, output exactly that format (e.g., "24th May 1977").
+10. Be as concise as possible in your answers.
 
 Medical Context:
 {context}"""

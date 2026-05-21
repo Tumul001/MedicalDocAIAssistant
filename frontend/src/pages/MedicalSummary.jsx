@@ -7,9 +7,17 @@ import ErrorAlert from '../components/ErrorAlert';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Stethoscope, RefreshCw, Activity, Pill, AlertTriangle, 
-  BarChart3, CheckCircle2, ArrowRight, ClipboardList, FileText,
-  Download, Share2, Zap, Brain, Sparkles
+  BarChart3, CheckCircle2, ClipboardList, FileText,
+  Download, Share2, Zap, Brain, Sparkles, Hash
 } from 'lucide-react';
+
+const SECTIONS = [
+  { key: 'diseases',        title: 'Clinical Diagnoses',   icon: <Stethoscope size={16} />,     color: 'rose'    },
+  { key: 'medications',     title: 'Medications',          icon: <Pill size={16} />,            color: 'cyan'    },
+  { key: 'allergies',       title: 'Allergies & Risks',    icon: <AlertTriangle size={16} />,   color: 'amber'   },
+  { key: 'abnormalities',   title: 'Abnormal Findings',    icon: <BarChart3 size={16} />,       color: 'violet'  },
+  { key: 'recommendations', title: 'Recommendations',      icon: <CheckCircle2 size={16} />,    color: 'emerald' },
+];
 
 export default function MedicalSummary() {
   const navigate = useNavigate();
@@ -24,19 +32,11 @@ export default function MedicalSummary() {
       const data = await getMedicalSummary();
       setSummary(data);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Failed to generate summary.');
+      setError(err?.response?.data?.detail || err?.message || 'Failed to generate summary.');
     } finally {
       setLoading(false);
     }
   };
-
-  const SECTIONS = [
-    { key: 'diseases',        title: 'Clinical Diagnoses',   icon: <Activity size={16} className="text-rose-400" />,     color: 'rose' },
-    { key: 'medications',     title: 'Medications',          icon: <Pill size={16} className="text-cyan-400" />,          color: 'cyan' },
-    { key: 'allergies',       title: 'Allergies & Risks',    icon: <AlertTriangle size={16} className="text-amber-400" />, color: 'amber' },
-    { key: 'abnormalities',   title: 'Abnormal Findings',    icon: <BarChart3 size={16} className="text-violet-400" />,  color: 'violet' },
-    { key: 'recommendations', title: 'Recommendations',      icon: <CheckCircle2 size={16} className="text-emerald-400" />, color: 'emerald' },
-  ];
 
   if (!documentLoaded) {
     return (
@@ -47,11 +47,10 @@ export default function MedicalSummary() {
           </div>
           <h2 className="heading-page mb-3">Clinical Summary</h2>
           <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-            Upload a medical document to generate a structured clinical analysis.
+            Upload a medical document to generate a structured AI clinical analysis.
           </p>
           <button onClick={() => navigate('/')} className="btn-primary w-full">
-            <FileText size={16} />
-            Upload Document
+            <FileText size={16} /> Upload Document
           </button>
         </motion.div>
       </div>
@@ -63,29 +62,24 @@ export default function MedicalSummary() {
     : 0;
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 px-6 md:px-10 pt-8 pb-12 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-          <div className="badge-cyan">
-            <Sparkles size={12} />
-            <span>AI-Powered Analysis</span>
-          </div>
-          <h1 className="heading-display text-3xl sm:text-4xl lg:text-5xl">
-            Clinical Summary
-          </h1>
+          <div className="badge-emerald"><Sparkles size={12} /><span>AI-Powered Extraction</span></div>
+          <h1 className="heading-display">Clinical Summary</h1>
           <p className="text-gray-400 text-sm max-w-lg leading-relaxed">
-            Automated extraction of medical entities, diagnoses, and clinical observations from patient records.
+            Automated AI extraction of medical entities, diagnoses, and clinical observations from patient records.
           </p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex items-center gap-3 flex-shrink-0">
           {summary && (
             <>
-              <button className="btn-icon" title="Download">
+              <button className="btn-icon text-emerald-400 hover:text-emerald-300 hover:border-emerald-500/30" title="Download PDF Report">
                 <Download size={15} />
               </button>
-              <button className="btn-icon" title="Share">
+              <button className="btn-icon text-cyan-400 hover:text-cyan-300 hover:border-cyan-500/30" title="Share findings">
                 <Share2 size={15} />
               </button>
             </>
@@ -113,68 +107,69 @@ export default function MedicalSummary() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="card py-20 flex flex-col items-center justify-center"
+            className="card py-24 flex flex-col items-center justify-center"
           >
-            <div className="relative w-20 h-20 mb-6">
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="absolute inset-0 border border-dashed border-cyan-500/20 rounded-full" />
-              <motion.div animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} className="absolute inset-2 border border-dotted border-violet-500/15 rounded-full" />
+            <div className="relative w-20 h-20 mb-8">
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="absolute inset-0 border border-dashed border-cyan-500/30 rounded-full" />
+              <motion.div animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} className="absolute inset-2 border border-dotted border-violet-500/20 rounded-full" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Brain className="text-cyan-400 animate-pulse" size={28} />
+                <Brain className="text-cyan-400 animate-pulse" size={32} />
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-1">Analyzing Document</h3>
-            <p className="text-sm text-gray-500">Extracting clinical entities and observations...</p>
+            <h3 className="text-lg font-semibold text-white mb-2">Extracting Clinical Data</h3>
+            <p className="text-sm text-gray-500 max-w-sm text-center leading-relaxed">
+              Using NLP to identify conditions, medications, and actionable recommendations.
+            </p>
           </motion.div>
         ) : summary ? (
           <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            {/* Summary Stats */}
+            
+            {/* Stats row */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
-              <div className="badge-white">
-                <ClipboardList size={11} />
-                <span>{totalFindings} findings extracted</span>
+              <div className="badge-cyan">
+                <Hash size={11} />
+                <span>{totalFindings} entities extracted</span>
               </div>
               <div className="badge-emerald">
-                <CheckCircle2 size={11} />
-                <span>Analysis complete</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>High Confidence</span>
+              </div>
+              <div className="badge-violet ml-auto hidden sm:flex">
+                <Activity size={11} />
+                <span>Structured Output</span>
               </div>
             </div>
 
-            {/* Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {SECTIONS.map((s, idx) => (
-                <motion.div
-                  key={s.key}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.06 }}
-                >
-                  <SummarySection
-                    title={s.title}
-                    items={summary[s.key]}
-                    icon={s.icon}
-                    color={s.color}
-                  />
-                </motion.div>
-              ))}
+            {/* Layout: Grid for sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <SummarySection title={SECTIONS[0].title} items={summary[SECTIONS[0].key]} icon={SECTIONS[0].icon} color={SECTIONS[0].color} />
+                <SummarySection title={SECTIONS[2].title} items={summary[SECTIONS[2].key]} icon={SECTIONS[2].icon} color={SECTIONS[2].color} />
+                <SummarySection title={SECTIONS[4].title} items={summary[SECTIONS[4].key]} icon={SECTIONS[4].icon} color={SECTIONS[4].color} />
+              </div>
+              <div className="space-y-4">
+                <SummarySection title={SECTIONS[1].title} items={summary[SECTIONS[1].key]} icon={SECTIONS[1].icon} color={SECTIONS[1].color} />
+                <SummarySection title={SECTIONS[3].title} items={summary[SECTIONS[3].key]} icon={SECTIONS[3].icon} color={SECTIONS[3].color} />
+              </div>
             </div>
+
           </motion.div>
         ) : (
           <motion.div 
             key="initial"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="card py-16 flex flex-col items-center justify-center text-center"
+            className="card py-20 flex flex-col items-center justify-center text-center"
           >
-            <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-gray-600 mb-5 group hover:text-cyan-400 transition-colors cursor-default">
-              <ClipboardList size={28} />
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-500/10 to-violet-500/10 border border-white/[0.06] flex items-center justify-center text-cyan-400 mb-6 glow-sm">
+              <Activity size={32} />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Ready to Analyze</h3>
-            <p className="text-sm text-gray-500 max-w-sm leading-relaxed mb-6">
-              Generate a structured clinical summary with automated entity extraction from the uploaded document.
+            <h3 className="text-xl font-semibold text-white mb-3">AI Pipeline Ready</h3>
+            <p className="text-sm text-gray-500 max-w-md leading-relaxed mb-8">
+              The document has been successfully processed. Click below to initiate the LLM extraction pipeline and generate a structured clinical summary.
             </p>
-            <button onClick={handleGenerate} className="btn-primary">
-              <Zap size={15} />
-              Generate Summary
+            <button onClick={handleGenerate} className="btn-primary shadow-lg shadow-cyan-500/20">
+              <Zap size={16} /> Start Extraction Pipeline
             </button>
           </motion.div>
         )}

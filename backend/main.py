@@ -18,7 +18,7 @@ from modules.vector_store import build_index, initialize_store
 from modules.hybrid_retrieval import build_bm25
 from modules.rag_pipeline import run_rag
 from modules.medical_summary import get_medical_summary, set_document_text, get_suggested_questions
-from modules.voice_handler import handle_voice_websocket   # ← NEW
+from modules.voice_handler import handle_voice_websocket
 from typing import List
 import uvicorn
 

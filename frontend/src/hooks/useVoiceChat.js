@@ -21,7 +21,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 const WS_URL      = "ws://localhost:8000/ws/voice";
 const SAMPLE_RATE = 16000;
 
-export function useVoiceChat({ onTranscript, onAnswer }) {
+export function useVoiceChat({ onTranscript, onAnswer, playAudio = true }) {
   // ── Public state ──────────────────────────────────────────────────────────
   const [voiceState, setVoiceState]   = useState("idle");
   // "idle" | "listening" | "processing" | "speaking"
@@ -36,6 +36,7 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
   const workletNodeRef = useRef(null);
   const sourceNodeRef  = useRef(null);
   const streamRef      = useRef(null);
+  const playbackRef    = useRef(null);
   const audioChunksRef = useRef([]);   // ← buffer PCM chunks here
 
   // ── Cleanup helper ────────────────────────────────────────────────────────
@@ -51,23 +52,35 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
 
   // ── Play base64 WAV audio ─────────────────────────────────────────────────
   const _playAudio = useCallback((base64Wav) => {
+    if (!playAudio) {
+      setVoiceState('idle');
+      return;
+    }
+
     try {
+      playbackRef.current?.pause();
       const audio = new Audio(`data:audio/wav;base64,${base64Wav}`);
+      playbackRef.current = audio;
       setVoiceState('speaking');
-      audio.onended = () => setVoiceState('idle');
+      audio.onended = () => {
+        playbackRef.current = null;
+        setVoiceState('idle');
+      };
       audio.onerror = (e) => {
         console.error('[Voice] Audio playback error:', e);
+        playbackRef.current = null;
         setVoiceState('idle');
       };
       audio.play().catch(err => {
         console.error('[Voice] play() failed:', err);
+        playbackRef.current = null;
         setVoiceState('idle');
       });
     } catch (err) {
       console.error('[Voice] Audio setup failed:', err);
       setVoiceState('idle');
     }
-  }, []);
+  }, [playAudio]);
 
   // ── Handle messages from backend WebSocket ────────────────────────────────
   const _handleMessage = useCallback((event) => {
@@ -104,7 +117,7 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
         break;
 
       case "done":
-        if (voiceState !== "speaking") setVoiceState("idle");
+        if (!playbackRef.current) setVoiceState("idle");
         break;
 
       case "error":
@@ -194,8 +207,14 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
     audioCtxRef.current?.close();
     audioCtxRef.current = null;
 
+    if (chunks.length === 0) {
+      wsRef.current?.close();
+      setVoiceState("idle");
+      return;
+    }
+
     // Send the entire buffered PCM as one binary message
-    if (wsRef.current?.readyState === WebSocket.OPEN && chunks.length > 0) {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
       // Concatenate all Int16 ArrayBuffers into one
       const totalBytes = chunks.reduce((sum, c) => sum + c.byteLength, 0);
       const combined   = new Uint8Array(totalBytes);
@@ -208,16 +227,23 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
 
       // Signal backend that audio is complete
       wsRef.current.send(JSON.stringify({ type: "end_of_audio" }));
+      // Stay in processing state until backend replies
+      setVoiceState("processing");
+    } else {
+      setErrorMsg("Connection to backend failed. Is the server running?");
+      setVoiceState("idle");
     }
 
     audioChunksRef.current = [];
-
-    // Stay in processing state until backend replies
-    setVoiceState("processing");
   }, [_cleanupAudio]);
 
   // ── Stop speaking early ───────────────────────────────────────────────────
   const stopSpeaking = useCallback(() => {
+    playbackRef.current?.pause();
+    if (playbackRef.current) {
+      playbackRef.current.currentTime = 0;
+      playbackRef.current = null;
+    }
     setVoiceState("idle");
   }, []);
 
@@ -225,6 +251,8 @@ export function useVoiceChat({ onTranscript, onAnswer }) {
   useEffect(() => {
     return () => {
       _cleanupAudio();
+      playbackRef.current?.pause();
+      playbackRef.current = null;
       wsRef.current?.close();
       audioCtxRef.current?.close();
     };
