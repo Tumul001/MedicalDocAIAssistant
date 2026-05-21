@@ -41,6 +41,18 @@ const DETECTED_LANGUAGE_NAMES = {
   or: 'Odia',
 };
 
+function stripMarkdownForVoice(text = '') {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+    .replace(/`{1,3}([\s\S]*?)`{1,3}/g, '$1')
+    .replace(/^\s*#{1,6}\s*/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/[*#_`~>|\\]/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 const STATE = {
   IDLE: 'idle',
   LISTENING: 'listening',
@@ -78,11 +90,12 @@ export default function VoiceAssistant({ selectedLanguage, onLanguageChange, com
       addChatMessage({ id: Date.now(), role: 'user', content: text, isVoice: true });
     },
     onAnswer: ({ text, confidence, sources }) => {
-      setAiResponse(text);
+      const displayText = stripMarkdownForVoice(text);
+      setAiResponse(displayText);
       addChatMessage({
         id: Date.now() + 1,
         role: 'assistant',
-        content: text,
+        content: displayText,
         confidence,
         sources,
         isVoice: true,

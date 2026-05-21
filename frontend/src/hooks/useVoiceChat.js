@@ -247,6 +247,16 @@ export function useVoiceChat({ onTranscript, onAnswer, playAudio = true }) {
     setVoiceState("idle");
   }, []);
 
+  // Stop current playback immediately when mute is enabled.
+  useEffect(() => {
+    if (playAudio || !playbackRef.current) return;
+
+    playbackRef.current.pause();
+    playbackRef.current.currentTime = 0;
+    playbackRef.current = null;
+    setVoiceState((prev) => (prev === "speaking" ? "idle" : prev));
+  }, [playAudio]);
+
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
