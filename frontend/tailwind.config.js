@@ -18,7 +18,22 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: [
+          'Noto Sans Devanagari',
+          'Noto Sans Bengali',
+          'Noto Sans Tamil',
+          'Noto Sans Telugu',
+          'Noto Sans Kannada',
+          'Noto Sans Gujarati',
+          'Noto Sans Malayalam',
+          'Noto Sans Gurmukhi',
+          'Noto Sans Oriya',
+          'Inter',
+          'Noto Sans',
+          'system-ui',
+          '-apple-system',
+          'sans-serif',
+        ],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       borderRadius: {

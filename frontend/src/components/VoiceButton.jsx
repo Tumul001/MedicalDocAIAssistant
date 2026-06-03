@@ -96,7 +96,7 @@ export default function VoiceButton({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col items-center gap-3 w-full">
+    <div className="flex flex-col items-center gap-3 w-full font-sans">
 
       {/* ── Error banner ── */}
       {errorMsg && (

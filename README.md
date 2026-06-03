@@ -1,506 +1,298 @@
-# 🏥 Medical AI Assistant — `NewVoiceIntegration_T` Branch
+# 🎙️ Voice 2.0 — MedicalDocAIAssistant
 
-> **For the frontend developer:** This branch adds full multilingual voice chat on top of the existing RAG-powered chat assistant. The backend and voice pipeline are complete and working. Your job is UI/UX visual improvements — this README tells you exactly what exists, what files to touch, and how to run everything.
-
----
-
-## 📋 Table of Contents
-
-1. [What's New in This Branch](#-whats-new-in-this-branch)
-2. [How Voice Works (End-to-End)](#-how-voice-works-end-to-end)
-3. [Project Structure](#-project-structure)
-4. [Frontend File Guide (For UI Work)](#-frontend-file-guide-for-ui-work)
-5. [Running the Project](#-running-the-project)
-6. [Environment Variables](#-environment-variables)
-7. [Voice States Reference](#-voice-states-reference)
-8. [API Reference](#-api-reference)
-9. [Original System Architecture](#-original-system-architecture)
-10. [Benchmark Results](#-benchmark-results)
-11. [Roadmap](#-roadmap)
-12. [Disclaimer](#-disclaimer)
+> **Branch:** `NewVoiceIntegration_T`
+> **Last updated:** May 2026
+> **For:** Frontend developer making UI/UX changes via Antigravity / Stitch
 
 ---
 
-## 🆕 What's New in This Branch
+## What is Voice 2.0?
 
-This branch adds **real-time multilingual voice interaction** to the chat assistant. Users can now:
+This branch adds **real-time multilingual voice chat** to the Medical AI Assistant.
 
-- 🎙️ Tap the mic button → speak in **any Indian language or English**
-- 🤖 Get a RAG answer retrieved from their uploaded medical document
-- 🔊 Hear the answer spoken back in the **same language** they asked in
+A user can now:
+1. **Tap the mic** in the chat input bar
+2. **Speak** a clinical question in any Indian language (Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati, Punjabi, Odia, Malayalam) or English
+3. **Tap the mic again** to stop
+4. The AI **reads the answer back** in the detected language using the Anushka (Sarvam Bulbul v2) voice
 
-### Files Added / Changed
+**No manual language selection needed.** Language is auto-detected from speech.
 
-| File | Status | What It Does |
+---
+
+## How the Pipeline Works (Frontend Dev Must Know)
+
+```
+User speaks
+    │
+    ▼
+[Browser mic]  →  raw 16-bit PCM audio at 16 kHz
+    │                (captured via AudioWorklet)
+    ▼
+[WebSocket /ws/voice]  →  sends PCM chunks to backend
+    │                       sends "end_of_audio" JSON when mic stops
+    ▼
+[Backend: Sarvam STT]  →  converts speech to text + detects language
+    │
+    ▼
+[Backend: RAG Pipeline]  →  queries the uploaded medical document
+    │
+    ▼
+[Backend: Sarvam TTS]  →  converts answer text to audio (WAV, base64)
+    │
+    ▼
+[Browser: Audio element]  →  plays the WAV response
+```
+
+### WebSocket Messages (Backend → Frontend)
+
+The frontend receives these JSON messages from the backend in order:
+
+| Message Type | When | Key Fields |
 |---|---|---|
-| `backend/modules/voice_handler.py` | **NEW** | Full voice pipeline: STT → RAG → TTS |
-| `frontend/src/hooks/useVoiceChat.js` | **NEW** | WebSocket client — manages mic, audio, state |
-| `frontend/src/components/VoiceButton.jsx` | **NEW** | Standalone voice button component (available for reuse) |
-| `frontend/public/pcm-processor.js` | **NEW** | AudioWorklet — captures raw PCM from microphone |
-| `frontend/src/pages/ChatAssistant.jsx` | **MODIFIED** | Inline mic button, voice state UI, stop button |
-| `backend/main.py` | **MODIFIED** | Added `/ws/voice` WebSocket endpoint |
-| `backend/requirements.txt` | **MODIFIED** | Added `httpx`, `websockets` |
-| `frontend/src/services/api.js` | **MODIFIED** | Added AbortController signal support |
-
-### New `.env` Variable Required
-
-```env
-# Add this to backend/.env (in addition to existing keys)
-SARVAM_API_KEY=sk_your_key_here
-```
+| `processing` | Right after audio received | — |
+| `final_transcript` | STT complete | `text`, `language` |
+| `answer` | RAG complete | `text`, `confidence`, `sources` |
+| `audio_ready` | TTS complete | `audio_b64` (base64 WAV) |
+| `done` | Session complete | — |
+| `error` | Anything fails | `message` |
 
 ---
 
-## 🔊 How Voice Works (End-to-End)
+## Voice State Machine
+
+The entire voice UI is driven by a single `voiceState` string. **This is what you build UI around.**
 
 ```
-User taps mic
-      │
-      ▼
-[Browser] Records mic audio as raw 16-bit PCM @ 16kHz
-   via AudioWorklet (pcm-processor.js)
-      │
-      ▼ (binary WebSocket frames)
-[Browser] Buffers all chunks in memory
-      │
-User taps mic again to stop
-      │
-      ▼ (sends full buffer + "end_of_audio" JSON signal)
-[Backend WebSocket /ws/voice]
-      │
-      ▼
-[voice_handler.py] Wraps PCM → WAV container
-      │
-      ▼ (POST multipart/form-data)
-[Sarvam AI — Saaras v3 STT]
-  Auto-detects language (hi/ta/te/kn/ml/bn/mr/gu/pa/or/en)
-  Returns: transcript + language_code
-      │
-      ▼
-[RAG Pipeline — run_rag(transcript)]
-  FAISS vector search + BM25 keyword search
-  Voyage AI reranking
-  Groq LLM (Llama 3.3 70B) answer generation
-  Returns: answer text + confidence + source pages
-      │
-      ▼
-[voice_handler.py] Strips markdown from answer (no asterisks read aloud)
-      │
-      ▼ (POST JSON)
-[Sarvam AI — Bulbul v2 TTS]
-  Speaker: anushka
-  Returns: base64 WAV audio
-      │
-      ▼ (WebSocket JSON messages back to browser)
-[Browser] Displays transcript bubble + answer bubble
-[Browser] Plays audio via <Audio> element
+"idle"  ──tap mic──▶  "listening"  ──tap mic──▶  "processing"  ──▶  "speaking"  ──▶  "idle"
+                                                                           │
+                                                                    (audio ends or
+                                                                     user taps stop)
 ```
 
-### WebSocket Messages (Browser ↔ Backend)
-
-**Browser → Backend:**
-| Frame Type | Content |
-|---|---|
-| Binary | Raw PCM audio chunks (sent continuously while recording) |
-| JSON | `{"type": "end_of_audio"}` — signals recording done |
-
-**Backend → Browser:**
-| Message | When |
-|---|---|
-| `{"type": "processing"}` | STT call started |
-| `{"type": "final_transcript", "text": "...", "language": "hi"}` | After STT |
-| `{"type": "answer", "text": "...", "confidence": {...}, "sources": [...]}` | After RAG |
-| `{"type": "audio_ready", "audio_b64": "...", "format": "wav"}` | After TTS |
-| `{"type": "done"}` | Session complete |
-| `{"type": "error", "message": "..."}` | Any failure |
-
----
-
-## 📁 Project Structure
-
-```
-MedicalDocAIAssistant/
-│
-├── backend/
-│   ├── main.py                    # FastAPI app + all HTTP/WS endpoints
-│   ├── requirements.txt
-│   ├── .env                       # ← you must create this (see below)
-│   ├── venv/                      # Python virtual environment
-│   └── modules/
-│       ├── voice_handler.py       # 🆕 Voice pipeline (STT→RAG→TTS)
-│       ├── rag_pipeline.py        # Core RAG logic
-│       ├── hybrid_retrieval.py    # FAISS + BM25 search
-│       ├── reranker.py            # Voyage AI reranking
-│       ├── embeddings.py          # Voyage AI embeddings
-│       ├── vector_store.py        # FAISS index management
-│       ├── chunking.py            # PDF → text chunks
-│       ├── pdf_parser.py          # PDF text extraction
-│       ├── ocr.py                 # EasyOCR fallback for scanned PDFs
-│       ├── confidence.py          # Confidence scoring
-│       ├── safety.py              # Anti-hallucination guard
-│       ├── prompts.py             # LLM system prompts
-│       └── api_manager.py        # API key rotation
-│
-└── frontend/
-    ├── public/
-    │   └── pcm-processor.js       # 🆕 AudioWorklet for mic capture
-    ├── src/
-    │   ├── pages/
-    │   │   ├── ChatAssistant.jsx  # 🔨 Main chat page (voice integrated here)
-    │   │   ├── Upload.jsx         # PDF upload page
-    │   │   ├── Summary.jsx        # Medical summary page
-    │   │   └── Evidence.jsx       # Evidence viewer page
-    │   ├── components/
-    │   │   ├── VoiceButton.jsx    # 🆕 Standalone voice button (reusable)
-    │   │   ├── ChatBubble.jsx     # Individual message bubble
-    │   │   ├── ErrorAlert.jsx     # Error banner
-    │   │   └── LoadingSpinner.jsx # Loading indicator
-    │   ├── hooks/
-    │   │   └── useVoiceChat.js    # 🆕 Voice WebSocket hook
-    │   ├── context/
-    │   │   └── DocumentContext.jsx # Global document + chat state
-    │   ├── services/
-    │   │   └── api.js             # All HTTP API calls
-    │   ├── index.css              # Global styles (Tailwind + custom)
-    │   └── main.jsx               # React entry point
-    └── package.json
-```
-
----
-
-## 🎨 Frontend File Guide (For UI Work)
-
-> **You're working on UI/UX visual changes.** Here's exactly where to look for each part of the interface.
-
-### Pages
-
-| Page | File | Route | What's on it |
-|---|---|---|---|
-| Upload | `src/pages/Upload.jsx` | `/` | PDF drag-and-drop, upload progress |
-| Chat Assistant | `src/pages/ChatAssistant.jsx` | `/chat` | Chat bubbles, input bar, mic button, sidebar |
-| Summary | `src/pages/Summary.jsx` | `/summary` | Medical summary cards |
-| Evidence | `src/pages/Evidence.jsx` | `/evidence` | Source evidence viewer |
-
-### Key Components
-
-| Component | File | Used In |
+| State | Meaning | What to show |
 |---|---|---|
-| Chat message bubble | `src/components/ChatBubble.jsx` | `ChatAssistant.jsx` |
-| Voice button (standalone) | `src/components/VoiceButton.jsx` | Available — not currently used inline |
-| Error banner | `src/components/ErrorAlert.jsx` | All pages |
-| Loading spinner | `src/components/LoadingSpinner.jsx` | All pages |
+| `"idle"` | Waiting for user | Grey mic icon, normal input |
+| `"listening"` | Recording audio | Red pulsing mic, waveform animation |
+| `"processing"` | STT + RAG + TTS running | Spinner/loading indicator |
+| `"speaking"` | Audio playing back | Speaker icon, "AI is speaking" |
 
-### Voice UI — Where to Edit
+---
 
-All voice UI in the chat lives in **`src/pages/ChatAssistant.jsx`**. Here's a map:
+## Frontend Files You'll Be Working With
+
+### 🎯 Main Page (Most UI work happens here)
+
+**`frontend/src/pages/ChatAssistant.jsx`**
+
+This is the main chat page. Key parts:
 
 ```jsx
-// ── HEADER AREA (line ~165–215) ──────────────────────────────────
-// Contains: title, Online/RAG Active/Voice Active badges, Stop button, Clear button
-// Edit this to change the header look
+// Voice state comes from the hook — use this to conditionally show UI
+const { voiceState, language, errorMsg, startListening, stopListening, stopSpeaking } = useVoiceChat(...)
 
-// ── CHAT MESSAGES AREA (line ~220–290) ───────────────────────────
-// Contains: empty state with suggested questions
-//           chat bubbles (via <ChatBubble />)
-//           "Analyzing records..." loading bubble (text queries)
-//           "Transcribing & thinking…" bubble (voice processing)
-//           "AI is speaking — tap ■ to stop" bubble (TTS playback)
-// Edit this to change how messages look
-
-// ── INPUT BAR (line ~295–370) ────────────────────────────────────
-// Contains: error banners, listening waveform strip, textarea,
-//           MIC BUTTON (inline, left of send), Send button
-// Edit this to change the input area look
-
-// ── SIDEBAR (line ~380–460) ──────────────────────────────────────
-// Contains: Assistant Configuration card, Suggested Questions card
-// Only visible on xl screens (1280px+)
+// Single mic button handler — call this on mic click
+const handleMicClick = () => {
+  if (voiceState === 'idle')      return startListening();
+  if (voiceState === 'listening') return stopListening();
+  if (voiceState === 'speaking')  return stopSpeaking();
+  // 'processing' → do nothing (show spinner)
+};
 ```
 
-### Voice State Values
+The mic button is currently inside the text input row. You can freely move it, restyle it, or add animations — **just keep `handleMicClick` wired to its `onClick`**.
 
-The `voiceState` prop/variable cycles through these 4 values:
+### 🎣 Voice Hook (Logic — don't touch unless needed)
 
-| State | What's Happening | UI Should Show |
-|---|---|---|
-| `"idle"` | Mic off, waiting | Grey mic icon, normal input |
-| `"listening"` | Recording audio | Red pulsing mic, waveform strip, red input border |
-| `"processing"` | STT + RAG + TTS running | Spinner in mic button, violet "thinking" bubble in chat |
-| `"speaking"` | Audio playing back | Speaker icon in mic button, teal "AI is speaking" bubble |
+**`frontend/src/hooks/useVoiceChat.js`**
 
-### Global Styles
+This hook manages the entire voice pipeline. It:
+- Opens the WebSocket to `ws://localhost:8000/ws/voice`
+- Captures mic audio via AudioWorklet
+- Sends PCM chunks to backend
+- Receives transcript, answer, and audio
+- Plays audio via `new Audio(data:audio/wav;base64,...)`
+- Calls `onTranscript` and `onAnswer` callbacks when data arrives
 
-All design tokens (colors, spacing, animations) are in **`src/index.css`**. The project uses **Tailwind CSS** with custom utility classes defined there:
+**What it exposes:**
 
-```css
-/* Key custom classes you'll use */
-.card              /* dark glassmorphism card */
-.card-interactive  /* card with hover effect */
-.btn-primary       /* cyan gradient button */
-.btn-icon          /* small square icon button */
-.badge-emerald     /* green status badge */
-.badge-cyan        /* cyan badge */
-.badge-violet      /* purple badge */
-.label             /* section label text */
-.heading-page      /* page heading */
-.scrollbar-thin    /* thin custom scrollbar */
+```js
+const {
+  voiceState,      // "idle" | "listening" | "processing" | "speaking"
+  language,        // detected language code: "hi", "en", "ta", etc.
+  errorMsg,        // string | null — show this in an error banner
+  startListening,  // () => void — call to start recording
+  stopListening,   // () => void — call to stop recording & process
+  stopSpeaking,    // () => void — call to interrupt audio playback
+  clearError,      // () => void — dismiss the error
+} = useVoiceChat({ onTranscript, onAnswer });
+```
+
+### 🎤 AudioWorklet Processor (Do not touch)
+
+**`frontend/public/pcm-processor.js`**
+
+A Web Audio API processor that captures mic audio as raw 16-bit PCM at 16 kHz.
+This file must stay in `frontend/public/` so it loads as a separate thread.
+
+### 🎨 (Legacy) VoiceButton Component
+
+**`frontend/src/components/VoiceButton.jsx`**
+
+This was the original separate voice panel component (now unused in the main chat page — the mic is inline instead). You can safely ignore or repurpose this.
+
+---
+
+## What the Current UI Looks Like
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🩺 Clinical Assistant                         [■ Stop] [🗑]   │
+│     ● Online  RAG Active  [● Listening… · Hindi]               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [chat messages appear here]                                    │
+│                                                                 │
+│  ● ● ●  Transcribing & thinking…   ← voice processing bubble   │
+│  🔊  AI is speaking — tap ■ to stop ← speaking bubble          │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─── Listening strip (only while recording) ────────────────┐ │
+│  │ ▌▌▌▌▌  Listening… tap the mic to stop        🎙 Recording │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 🎙  [  Ask a clinical question…              ] [➤ Send] │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│     ⚡ Online  ✓ Verified Sources      🎙 Tap mic to speak     │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Running the Project
+## UI/UX Changes You Can Make Freely
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- A Sarvam AI API key (get from [dashboard.sarvam.ai](https://dashboard.sarvam.ai))
+These are purely visual — no logic changes needed:
 
-### Step 1 — Backend
+### ✅ Safe to restyle/animate
+- The mic button shape, size, color, position
+- The listening waveform strip (currently 5 animated bars)
+- The "processing" and "speaking" chat bubbles
+- The stop button in the header
+- The voice state badge in the header (`● Listening… · Hindi`)
+- Error banners
+- The overall input bar layout
 
+### ✅ Safe to add
+- Haptic feedback on mic tap (mobile)
+- Microphone permission request UI
+- A tooltip/onboarding nudge ("Tap to speak in Hindi, English...")
+- Speaking progress animation (audio duration bar)
+- Language flag emoji next to detected language badge
+
+### ⚠️ Change carefully (logic is tied to these)
+- The mic button's `onClick` handler — must call `handleMicClick()`
+- The stop button's `onClick` — must call `handleStop()`
+- The `voiceState` conditional rendering logic
+
+### ❌ Don't touch
+- `useVoiceChat.js` internals
+- `pcm-processor.js`
+- `voice_handler.py` on the backend
+
+---
+
+## Running Locally
+
+### Backend
 ```powershell
-# Navigate to backend
-cd MedicalDocAIAssistant\backend
-
-# Create virtual environment (first time only)
-python -m venv venv
-
-# Activate virtual environment
+cd backend
 .\venv\Scripts\activate
-
-# Install dependencies (first time only)
-pip install -r requirements.txt
-
-# Start backend (important: set UTF-8 encoding for Hindi/multilingual logs)
+# Windows — must set UTF-8 or Hindi text crashes the console
 $env:PYTHONIOENCODING="utf-8"
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-✅ You should see:
-```
-[APIKeyManager] Loaded 2 key(s) for Groq
-[VectorStore] Loaded existing index with N vectors.
-[Startup] Medical AI Assistant backend is ready.
-INFO:     Application startup complete.
-```
-
-### Step 2 — Frontend
-
+### Frontend
 ```powershell
-# In a new terminal — navigate to frontend
-cd MedicalDocAIAssistant\frontend
-
-# Install dependencies (first time only)
+cd frontend
 npm install
-
-# Start dev server
 npm run dev
 ```
 
-Open **http://localhost:5173** in your browser.
-
-### Available URLs
-
-| URL | What |
-|---|---|
-| http://localhost:5173 | Upload page |
-| http://localhost:5173/chat | Chat + Voice assistant |
-| http://localhost:5173/summary | Medical summary |
-| http://localhost:5173/evidence | Evidence viewer |
-| http://localhost:8000/docs | Swagger API explorer |
-| http://localhost:8000/health | Backend health check |
+Open **http://localhost:5173**
 
 ---
 
-## 🔑 Environment Variables
+## Environment Variables (Backend)
 
-Create `backend/.env` with all of the following:
+File: `backend/.env`
 
 ```env
-# Groq API keys — comma-separated, auto-rotated on rate-limit
-GROQ_API_KEYS=gsk_key1,gsk_key2
-
-# Voyage AI API key — for embeddings + reranking
-VOYAGE_API_KEYS=pa-key1
-
-# Sarvam AI API key — for voice STT + TTS (NEW in this branch)
-SARVAM_API_KEY=sk_your_sarvam_key_here
+SARVAM_API_KEY=sk_...        # Speech-to-Text + Text-to-Speech
+GROQ_API_KEY=gsk_...         # LLM (Llama 3.3 70B)
+VOYAGE_AI_API_KEY=pa-...     # Embeddings for RAG
 ```
 
-> ⚠️ Without `SARVAM_API_KEY`, the voice mic button will show an error when clicked. Text chat works fine without it.
+> ⚠️ Never commit `.env` to git. It's in `.gitignore`.
 
 ---
 
-## 🎙️ Voice States Reference
+## Voice API Details (Sarvam AI)
 
-The `useVoiceChat` hook (in `src/hooks/useVoiceChat.js`) exposes:
-
-```js
-const {
-  voiceState,       // "idle" | "listening" | "processing" | "speaking"
-  language,         // detected language code: "hi", "en", "ta", etc.
-  errorMsg,         // string | null — voice-specific error
-  startListening,   // () => void — opens WS + starts mic
-  stopListening,    // () => void — sends audio to backend
-  stopSpeaking,     // () => void — stops audio playback
-  clearError,       // () => void — clears errorMsg
-} = useVoiceChat({ onTranscript, onAnswer });
-```
-
-**Callbacks:**
-
-```js
-// Called when STT returns — adds user's spoken text to chat
-onTranscript: ({ text }) => void
-
-// Called when RAG answers — adds AI answer bubble to chat
-onAnswer: ({ text, confidence, sources }) => void
-```
-
-**Supported Languages (auto-detected):**
-
-| Code | Language |
+| Feature | Details |
 |---|---|
-| `hi` | Hindi |
-| `en` | English |
-| `ta` | Tamil |
-| `te` | Telugu |
-| `kn` | Kannada |
-| `ml` | Malayalam |
-| `bn` | Bengali |
-| `mr` | Marathi |
-| `gu` | Gujarati |
-| `pa` | Punjabi |
-| `or` | Odia |
+| STT Model | `saaras:v3` |
+| STT Endpoint | `POST https://api.sarvam.ai/speech-to-text` |
+| Audio format | WAV (16 kHz, mono, 16-bit PCM) |
+| Language detection | Automatic (`language_code: "unknown"`) |
+| TTS Model | `bulbul:v2` |
+| TTS Endpoint | `POST https://api.sarvam.ai/text-to-speech` |
+| TTS Voice | `anushka` (female, Indian English + Indian languages) |
+| TTS Output | WAV audio as base64 in `audios[0]` |
+
+**Supported languages for voice:**
+`hi` Hindi · `ta` Tamil · `te` Telugu · `kn` Kannada · `ml` Malayalam
+`bn` Bengali · `mr` Marathi · `gu` Gujarati · `pa` Punjabi · `or` Odia · `en` English
 
 ---
 
-## 📡 API Reference
+## Key Files Map
 
-### HTTP Endpoints
+```
+MedicalDocAIAssistant/
+├── backend/
+│   ├── main.py                        ← WebSocket route /ws/voice registered here
+│   ├── modules/
+│   │   └── voice_handler.py           ← ALL voice logic (STT, RAG, TTS)
+│   └── .env                           ← API keys (not in git)
+│
+└── frontend/
+    ├── public/
+    │   └── pcm-processor.js           ← AudioWorklet (mic capture worker)
+    └── src/
+        ├── hooks/
+        │   └── useVoiceChat.js        ← Voice state machine + WebSocket client
+        ├── components/
+        │   └── VoiceButton.jsx        ← Legacy component (unused, available)
+        └── pages/
+            └── ChatAssistant.jsx      ← Main chat UI (mic button lives here)
+```
 
-| Method | Endpoint | What |
+---
+
+## What Was Changed From Previous Version
+
+| Area | Before | After |
 |---|---|---|
-| `GET` | `/health` | Health check — returns `{"status": "ok"}` |
-| `POST` | `/upload` | Upload PDF — `multipart/form-data` with `file` field |
-| `POST` | `/chat` | Send text message — `{"message": "..."}` |
-| `GET` | `/questions` | Get AI-suggested questions for the current document |
-| `GET` | `/summary` | Get medical summary of current document |
-
-### WebSocket
-
-| Endpoint | Protocol | What |
-|---|---|---|
-| `/ws/voice` | WebSocket | Full voice session (see flow diagram above) |
+| STT | WebSocket streaming (beta, broken) | REST API POST (production, working) |
+| TTS | None | Sarvam Bulbul v2, anushka voice |
+| Audio capture | None | AudioWorklet PCM at 16 kHz |
+| Voice UX | Not implemented | Inline mic in input bar |
+| Language support | English only | 11 Indian languages + English, auto-detected |
+| Markdown in TTS | Would read `**asterisks**` aloud | Stripped before TTS |
+| Audio playback | AudioContext (buggy) | `new Audio()` element (reliable) |
 
 ---
 
-## 🏗️ Original System Architecture
-
-```
-PDF Upload
-    │
-    ▼
-[pdf_parser.py] Text extraction (pdfplumber)
-    │ fails?
-    ▼
-[ocr.py] EasyOCR fallback for scanned pages
-    │
-    ▼
-[chunking.py] Split into ~400-token overlapping chunks
-    │
-    ▼
-[embeddings.py] Voyage AI voyage-3 embeddings
-    │
-    ▼
-[vector_store.py] FAISS index (persisted to disk)
-[hybrid_retrieval.py] BM25 index (built at startup)
-
-─────────────────────────────────────────────────
-
-Query (text or voice transcript)
-    │
-    ▼
-[hybrid_retrieval.py] FAISS cosine + BM25 keyword → top 20 chunks
-    │
-    ▼
-[reranker.py] Voyage AI rerank-2 → top 5 chunks
-    │
-    ▼
-[safety.py] Block if rerank_score < 0.10 (no relevant content)
-    │
-    ▼
-[prompts.py] Build LLM prompt with chunks as context
-    │
-    ▼
-[Groq API] llama-3.3-70b-versatile → answer text
-    │
-    ▼
-[confidence.py] Score confidence: High / Medium / Low
-    │
-    ▼
-API response: { answer, confidence, sources }
-```
-
----
-
-## 📊 Benchmark Results
-
-*Test document: Kimberly Lawrence — Type 2 Diabetes + Peripheral Neuropathy*
-*Model: Llama 3.3 70B + Voyage voyage-3*
-
-| Metric | Score |
-|---|---|
-| Retrieval Recall@5 | **80.0%** (12/15) |
-| Grounded QA Accuracy | **73.3%** (11/15) |
-| Hallucination Rate | **26.7%** (4/15) |
-| Confidence Calibration | **100.0%** (11/11 correct answers) |
-| Avg ROUGE-L | **0.1317** |
-| **Overall End-to-End** | **73.3%** |
-
----
-
-## 🔒 Security
-
-- File upload validated client-side (type + size) **and** server-side
-- CORS restricted to `localhost:5173` only — no wildcard
-- Anti-hallucination guard: blocks LLM if retrieval score < 0.10
-- Grounding check: demotes High → Medium if answer words not found in source chunks
-- API keys never exposed to frontend
-
----
-
-## 🗺️ Roadmap
-
-- [x] FAISS + BM25 hybrid retrieval
-- [x] Voyage AI reranking
-- [x] Confidence scoring + calibration
-- [x] Anti-hallucination safety guard
-- [x] Evaluation script (`run_eval.py`)
-- [x] **Multilingual voice chat (this branch)**
-- [ ] Streaming chat responses (SSE / token-by-token)
-- [ ] Multi-document sessions
-- [ ] User authentication (JWT)
-- [ ] Redis session store
-- [ ] Docker + docker-compose
-- [ ] DICOM / HL7 support
-
----
-
-## 👥 Team
-
-| Developer | Owns |
-|---|---|
-| **Backend Lead** | `pdf_parser.py`, `ocr.py`, `chunking.py`, `entities.py`, `medical_summary.py` |
-| **ML/API Lead** | `embeddings.py`, `vector_store.py`, `hybrid_retrieval.py`, `reranker.py`, `rag_pipeline.py`, `confidence.py`, `safety.py`, `prompts.py`, `api_manager.py`, `main.py`, `voice_handler.py` |
-| **Frontend Lead** | Entire `frontend/` — all pages, context, API layer, components, voice UI |
-
----
-
-## ⚠️ Disclaimer
-
-> This system is a **development and research tool** for AI-assisted document analysis. It is **not certified for clinical use** and should **never** be used as the sole basis for medical decisions. All outputs must be reviewed by qualified healthcare professionals.
-
----
-
-*Medical AI Assistant v1.1.0 — Powered by Groq + Voyage AI + Sarvam AI*
-*Branch: `NewVoiceIntegration_T`*
+*For backend questions, check `voice_handler.py` — it's well-commented.*
+*For voice API docs, see [docs.sarvam.ai](https://docs.sarvam.ai)*

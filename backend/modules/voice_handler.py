@@ -51,18 +51,62 @@ TTS_CHAR_LIMIT = 500
 
 
 def _clean_for_tts(text: str) -> str:
-    """Strip markdown symbols so TTS reads clean natural text."""
+    """Normalize markdown-ish text into clean, speech-friendly sentences."""
     import re
-    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)   # **bold**, *italic*, ***both***
-    text = re.sub(r'#{1,6}\s*', '', text)                  # ### headings
-    text = re.sub(r'`{1,3}.*?`{1,3}', '', text, flags=re.S)  # `code` blocks
-    text = re.sub(r'^\s*[-•–*]\s+', '', text, flags=re.M)  # bullet points
-    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.M)   # numbered lists
-    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)   # [links](url) → text
-    text = re.sub(r'[_~>|\\]', '', text)                   # remaining symbols
-    text = re.sub(r'\n{2,}', '. ', text)                   # blank lines → pause
-    text = re.sub(r'\n', ' ', text)                        # single newlines → space
-    text = re.sub(r'\s{2,}', ' ', text)                    # collapse whitespace
+
+    if not text:
+        return ""
+
+    # Remove fenced code blocks and inline code markers.
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+
+    # Strip images and links.
+    text = re.sub(r"!\[([^\]]*)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+
+    # Remove headings, blockquotes, and horizontal rules.
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"^\s*>+\s?", "", text, flags=re.M)
+    text = re.sub(r"^\s*([-*_]){3,}\s*$", " ", text, flags=re.M)
+
+    # Strip emphasis and strikethrough markers.
+    text = re.sub(r"\*\*\*(.*?)\*\*\*", r"\1", text)
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.*?)\*", r"\1", text)
+    text = re.sub(r"__(.*?)__", r"\1", text)
+    text = re.sub(r"_(.*?)_", r"\1", text)
+    text = re.sub(r"~~(.*?)~~", r"\1", text)
+
+    # Convert list items into sentence-like output for better pauses.
+    def _list_to_sentence(match) -> str:
+        item = match.group(1).strip()
+        if not item:
+            return ""
+        item = re.sub(r"^\[(?: |x|X)\]\s*", "", item)
+        if re.search(r"[.!?]$", item):
+            return item
+        return f"{item}."
+
+    text = re.sub(
+        r"^\s*(?:[-*•–]|\d+[.)]|[a-zA-Z][.)])\s+(.*)$",
+        _list_to_sentence,
+        text,
+        flags=re.M,
+    )
+
+    # Remove HTML tags and table separators.
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s*\|\s*", ", ", text)
+
+    # Drop any remaining formatting symbols.
+    text = re.sub(r"[\\*_~`]", "", text)
+
+    # Normalize whitespace and add pauses on paragraph breaks.
+    text = re.sub(r"\n{2,}", ". ", text)
+    text = re.sub(r"\n", " ", text)
+    text = re.sub(r"\s{2,}", " ", text)
+
     return text.strip()
 
 
