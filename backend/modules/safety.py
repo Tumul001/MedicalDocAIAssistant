@@ -11,7 +11,12 @@ INSUFFICIENT_EVIDENCE_RESPONSE = (
 )
 
 MIN_CHUNKS_REQUIRED = 1
-MIN_RERANK_SCORE = 0.10
+# Lowered from 0.10 → 0.04 so that general/meta questions
+# (which score low on BM25 but have moderate FAISS hits) still
+# reach the LLM. The LLM prompt now handles the "no relevant
+# context" case itself, so the safety gate only needs to catch
+# truly empty retrievals (index empty or query completely off-topic).
+MIN_RERANK_SCORE = 0.04
 
 
 def is_evidence_sufficient(chunks: List[Dict]) -> bool:
